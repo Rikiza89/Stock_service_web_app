@@ -62,6 +62,49 @@ class Society(models.Model):
     def get_max_users(self):
         return SUBSCRIPTION_LIMITS.get(self.subscription_level, {})['max_users']
 
+# class User(AbstractUser):
+#     """
+#     Custom user model for the stock management system.
+#     Each user belongs to a specific society.
+#     """
+#     society = models.ForeignKey(
+#         'Society',
+#         on_delete=models.CASCADE,
+#         related_name='users',
+#         verbose_name=_("Society")
+#     )
+#     is_society_admin = models.BooleanField(_("Is Society Admin"), default=False)
+
+#     class Meta:
+#         verbose_name = _("User")
+#         verbose_name_plural = _("Users")
+#         unique_together = ('username', 'society') # Ensure username is unique within a society
+
+#     def __str__(self):
+#         return f"{self.username} ({self.society.name})"
+
+#     # Add related_name to avoid clashes with auth.User
+#     # Make sure related_name for groups and user_permissions are UNIQUE
+#     groups = models.ManyToManyField(
+#         Group,
+#         verbose_name=_('groups'),
+#         blank=True,
+#         help_text=_(
+#             'The groups this user belongs to. A user will get all permissions '
+#             'granted to each of their groups.'
+#         ),
+#         related_name="stock_service_user_groups", # Changed for clarity and uniqueness
+#         related_query_name="stock_service_user_in_group", # Changed for clarity and uniqueness
+#     )
+#     user_permissions = models.ManyToManyField(
+#         Permission,
+#         verbose_name=_('user permissions'),
+#         blank=True,
+#         help_text=_('Specific permissions for this user.'),
+#         related_name="stock_service_user_permissions", # <-- CRITICAL: Made this unique!
+#         related_query_name="stock_service_user_has_perm", # <-- Also made this unique!
+#     )
+
 class User(AbstractUser):
     """
     Custom user model for the stock management system.
@@ -95,17 +138,9 @@ class User(AbstractUser):
         from django.core.exceptions import ValidationError
         super().clean()
 
-        # --------------------------------------------------------------------------
-        # 【修正箇所】: is_staff または is_superuser の場合は、society 必須チェックをスキップ
-        # --------------------------------------------------------------------------
-        is_admin_or_staff = self.is_superuser or self.is_staff
-
-        if self.is_active and not self.society and not is_admin_or_staff:
+        # Allow superusers to exist without a Society
+        if self.is_active and not self.is_superuser and not self.society:
             raise ValidationError(_("アクティブなユーザーは社会に関連付けられている必要があります。"))
-
-        # is_active=True の管理者ユーザーが society=None でも保存できるように、
-        # このチェックから除外します。
-        # --------------------------------------------------------------------------
 
     def save(self, *args, **kwargs):
         """
