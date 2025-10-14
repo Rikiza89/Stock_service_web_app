@@ -102,6 +102,27 @@ python manage.py createsuperuser
 
 ---
 
+## ⚙️ オプション設定: サンプルデータのロード (Optional Sample Data Loading)
+
+初期状態でテスト用のデータを作成する場合は、以下のコマンドを使用してサンプルデータを読み込むことができます。
+
+```bash
+python manage.py load_sample_data_stock_service
+```
+
+このコマンドは以下の場所に定義されています:
+
+```
+stock_service/management/commands/load_sample_data_stock_service.py
+```
+
+> 🧠 **説明:**  
+> このスクリプトは、デモ用にSociety・User・StockObjectなどの初期データを自動で生成します。  
+> 実運用時にはこのコマンドの利用は任意です。
+
+---
+
+
 ## 4️⃣ 開発サーバーの実行
 
 以下の標準的な Django コマンドを使用してアプリケーションを起動します。
