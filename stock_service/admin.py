@@ -8,16 +8,8 @@ from .models import (
     Society, User, StockObjectKind, StockObject, Drawer, StockObjectDrawerPlacement,
     StockMovement, ObjectUser, StockUsage, RefillSchedule
 )
-from django.contrib.auth.models import User as AuthUser # Import the built-in user model for unregistering
 
 # --- Import-Export Resources ---
-# 💡 修正ステップ: デフォルトのUserAdminを先に解除する
-# get_user_model() が返したカスタムUserモデルが、デフォルトのUserAdminで登録されていないかチェックし、解除する
-try:
-    admin.site.unregister(User) 
-except admin.sites.NotRegistered:
-    # 既に登録解除されているか、元々登録されていなかった場合は何もしない
-    pass
 
 class SocietyResource(resources.ModelResource):
     class Meta:
@@ -81,43 +73,43 @@ class RefillScheduleResource(resources.ModelResource):
 
 # --- Admin Classes ---
 
-# Society モデルの管理サイト登録 (確認用)
 @admin.register(Society)
-class SocietyAdmin(admin.ModelAdmin):
-    list_display = ('name', 'is_active', 'created_at')
-    search_fields = ('name',)
-    list_filter = ('is_active',)
+class SocietyAdmin(ImportExportModelAdmin):
+    resource_class = SocietyResource
+    list_display = ('name', 'slug', 'is_active', 'subscription_level', 'can_manage_drawers', 'shows_drawers_in_list', 'created_at',)
+    list_filter = ('is_active', 'subscription_level', 'can_manage_drawers', 'shows_drawers_in_list',)
+    search_fields = ('name', 'slug',)
+    prepopulated_fields = {'slug': ('name',)}
+    fieldsets = (
+        (None, {'fields': ('name', 'slug', 'is_active', 'subscription_level')}),
+        (_('Drawer Management Settings'), {'fields': ('can_manage_drawers', 'shows_drawers_in_list',), 'classes': ('collapse',)}),
+        (_('Timestamps'), {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',), 'description': _("Automatically generated timestamps.")}),
+    )
+    readonly_fields = ('created_at', 'updated_at',)
 
-# カスタムUserモデルの管理クラスを定義
-@admin.register(User) 
-class UserAdmin(BaseUserAdmin):
-    # 既存のフィールドセットに 'society' を追加
+
+@admin.register(User)
+class UserAdmin(ImportExportModelAdmin, BaseUserAdmin):
+    resource_class = UserResource
+    list_display = ('username', 'email', 'society', 'is_staff', 'is_active', 'is_society_admin', 'date_joined',)
+    list_filter = ('is_staff', 'is_active', 'is_society_admin', 'society',)
+    search_fields = ('username', 'email', 'society__name',)
+    # Customizing fieldsets for the User model
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
-        ('Personal info', {'fields': ('first_name', 'last_name', 'email', 'society')}),
-        ('Permissions', {
-            'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
-        }),
-        ('Important dates', {'fields': ('last_login', 'date_joined')}),
+        (_('Personal info'), {'fields': ('first_name', 'last_name', 'email')}),
+        (_('Permissions'), {'fields': ('is_active', 'is_staff', 'is_superuser', 'is_society_admin', 'groups', 'user_permissions')}),
+        (_('Important dates'), {'fields': ('last_login', 'date_joined')}),
+        (_('Society Information'), {'fields': ('society',)}),
     )
-    
-    # ユーザー追加フォームのフィールドセットに 'society' を追加
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('username', 'email', 'first_name', 'last_name', 'society', 'password', 'password2'),
+            'fields': ('username', 'email', 'password', 'society', 'is_society_admin',),
         }),
     )
-    
-    # 【修正箇所 1】: BaseUserAdmin の list_display を拡張し、society を追加
-    list_display = BaseUserAdmin.list_display + ('society', 'is_society_admin',)
-    
-    # 【修正箇所 2】: BaseUserAdmin の list_filter を拡張し、society を追加
-    # society は ForeignKey フィールドなので、そのまま list_filter に追加可能です
-    list_filter = BaseUserAdmin.list_filter + ('society',) 
-    
-    # 検索フィールドに追加 (これは問題ありません)
-    search_fields = ('username', 'first_name', 'last_name', 'email')
+    ordering = ('society', 'username',)
+
 
 @admin.register(StockObjectKind)
 class StockObjectKindAdmin(ImportExportModelAdmin):
