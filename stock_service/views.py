@@ -162,39 +162,6 @@ def register_society_stock_service(request):
         form = SocietyRegistrationForm()
     return render(request, 'stock_service/register_society.html', {'form': form, 'title': _('新しい社会を登録')})
 
-# def custom_login_stock_service(request):
-#     """
-#     カスタムログインビュー。社会名、ユーザー名、パスワードを要求する。
-#     """
-#     if request.user.is_authenticated:
-#         return redirect(reverse('stock_service:app_home_stock_service'))
-
-#     if request.method == 'POST':
-#         form = CustomAuthenticationForm(request, data=request.POST)
-#         if form.is_valid():
-#             society_name = form.cleaned_data.get('society_name')
-#             username = form.cleaned_data.get('username')
-#             password = form.cleaned_data.get('password')
-
-#             # 新しいSocietyAuthBackendに社会名も渡して認証を試みる
-#             user = authenticate(request, username=username, password=password, society_name=society_name)
-
-#             if user is not None:
-#                 # ユーザーが認証されたら、ログイン処理
-#                 login(request, user)
-#                 messages.success(request, _('ようこそ、%(username)sさん！') % {'username': user.username})
-#                 return redirect(reverse('stock_service:app_home_stock_service'))
-#             else:
-#                 messages.error(request, _('無効なユーザー名、パスワード、または社会です。'))
-#         else:
-#             # フォームのバリデーションエラーメッセージを表示
-#             for field_name, errors in form.errors.items():
-#                 for error in errors:
-#                     label = form.fields[field_name].label if field_name in form.fields else field_name
-#                     messages.error(request, f"{label}: {error}")
-#     else:
-#         form = CustomAuthenticationForm()
-#     return render(request, 'stock_service/custom_login.html', {'form': form, 'title': _('ログイン')})
 
 def custom_login_stock_service(request):
     """
@@ -245,7 +212,6 @@ def user_profile_view(request):
     """
     user = request.user
 
-    # Get user's additional information
     context = {
         'title': 'プロフィール', # This title is still used by app_base.html
         'user': user, # The user object itself is needed for groups/permissions
@@ -281,35 +247,6 @@ def custom_logout_stock_service(request):
     messages.info(request, _('ログアウトしました。'))
     return redirect(reverse('stock_service:custom_login_stock_service'))
 
-# @login_required(login_url='stock_service:custom_login_stock_service')
-# def app_home_stock_service(request):
-#     """
-#     アプリケーションのホームビュー。
-#     ログインユーザーの社会に紐づく情報を表示するダッシュボード。
-#     """
-#     society = request.user.society
-#     total_stock_objects = StockObject.objects.filter(society=society).count()
-#     low_stock_objects = StockObject.objects.filter(
-#         society=society,
-#         current_quantity__lt=F('minimum_quantity')
-#     ).count()
-
-#     recent_movements = StockMovement.objects.filter(society=society).order_by('-timestamp')[:5]
-#     upcoming_refills = RefillSchedule.objects.filter(
-#         society=society,
-#         is_completed=False,
-#         scheduled_date__gte=date.today()
-#     ).order_by('scheduled_date')[:5]
-
-#     context = {
-#         'society': society,
-#         'total_stock_objects': total_stock_objects,
-#         'low_stock_objects': low_stock_objects,
-#         'recent_movements': recent_movements,
-#         'upcoming_refills': upcoming_refills,
-#         'title': _('ダッシュボード')
-#     }
-#     return render(request, 'stock_service/app_home.html', context)
 
 @login_required(login_url='stock_service:custom_login_stock_service')
 def app_home_stock_service(request):
@@ -605,7 +542,6 @@ def refill_prediction_stock_service(request, stock_object_pk=None):
         else: # total_used_in_90_days == 0 (No usage in last 90 days)
             predicted_refill_date = _('利用が検出されません') # default for no usage
 
-            # --- ALERT CONDITION 4: No usage, but stock is below minimum ---
             if stock_object_item.current_quantity <= stock_object_item.minimum_quantity:
                 # If no usage, but current stock is below minimum, it still needs attention
                 predicted_refill_date = _('最低在庫量を下回っています')
@@ -821,8 +757,6 @@ def fake_payment_view(request):
 
     return redirect(reverse('stock_service:pricing_stock_service')) # Redirect will cause a fresh request and user object reload
     # Added refresh_from_db() to pricing_view directly to ensure it gets the latest data.
-
-
 
 
 @login_required(login_url='stock_service:custom_login_stock_service')
