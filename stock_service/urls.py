@@ -1,19 +1,14 @@
-# stock_service/urls.py
 from django.urls import path
 from . import views
 from django.utils.translation import gettext_lazy as _
 from .views import (
-    # (既存のビューインポート)
-    # 例: UserListView, UserCreateView, UserUpdateView, UserDeleteView,
-    # DepartmentListView, DepartmentCreateView, DepartmentUpdateView, DepartmentDeleteView,
-    # StockUsageListView, StockUsageCreateView, StockUsageUpdateView, StockUsageDeleteView,
     ObjectUserListView, ObjectUserCreateView, ObjectUserUpdateView, ObjectUserDeleteView,StockObjectKindUpdateView, StockObjectKindDeleteView, DrawerUpdateView, DrawerDeleteView,
     UserListView,
     UserCreateView,
     UserUpdateView,
-    UserDeleteView, # ObjectUserビューをインポート
+    UserDeleteView,
 )
-app_name = 'stock_service' # アプリケーションの名前空間を定義
+app_name = 'stock_service'
 
 urlpatterns = [
     # --- NEW: User Management URLs ---
@@ -21,7 +16,6 @@ urlpatterns = [
     path('users/create/', UserCreateView.as_view(), name='user_create'),
     path('users/<int:pk>/update/', UserUpdateView.as_view(), name='user_update'),
     path('users/<int:pk>/delete/', UserDeleteView.as_view(), name='user_delete'),
-
 
     # 認証関連
     path('login_stock_service/', views.custom_login_stock_service, name='custom_login_stock_service'),
@@ -82,4 +76,5 @@ urlpatterns = [
     path('objectusers/create/', ObjectUserCreateView.as_view(), name='objectuser_create'),
     path('objectusers/<uuid:pk>/update/', ObjectUserUpdateView.as_view(), name='objectuser_update'), # UUIDFieldのためpkをuuidで定義
     path('objectusers/<uuid:pk>/delete/', ObjectUserDeleteView.as_view(), name='objectuser_delete'), # UUIDFieldのためpkをuuidで定義
+
 ]
