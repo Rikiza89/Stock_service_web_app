@@ -126,15 +126,13 @@ class UserCreateForm(UserCreationForm):
         }
 
     def __init__(self, *args, **kwargs):
-        self.society = kwargs.pop('society', None) # Get the society instance from kwargs
+        self.society = kwargs.pop('society', None)
         super().__init__(*args, **kwargs)
 
-        # Apply Bootstrap's form-control class to all text/email inputs
         for field_name in ['username', 'first_name', 'last_name', 'email']:
             if field_name in self.fields: # Check if field exists before updating attrs
                 self.fields[field_name].widget.attrs.update({'class': 'form-control'})
 
-        # Apply form-check-input to checkboxes
         for field_name in ['is_society_admin', 'is_active']:
             if field_name in self.fields: # Check if field exists before updating attrs
                 self.fields[field_name].widget.attrs.update({'class': 'form-check-input'})
@@ -143,28 +141,22 @@ class UserCreateForm(UserCreationForm):
     def clean(self):
         cleaned_data = super().clean()
         username = cleaned_data.get('username')
-        is_society_admin = cleaned_data.get('is_society_admin') # The NEW state of is_society_admin
+        is_society_admin = cleaned_data.get('is_society_admin')
 
         if not self.society:
-            # This should be caught by UserCreateView's get_form_kwargs, but as a safeguard
             raise forms.ValidationError(_("社会情報がフォームに渡されていません。"))
 
-        # Check unique_together constraint for username within society
         if username and self.society:
             if User.objects.filter(society=self.society, username__iexact=username).exists():
                 self.add_error('username', _("このユーザー名は既にこの社会で使用されています。"))
 
-        # --- NEW: Subscription Limits Validation for Creation ---
         current_level = self.society.subscription_level
         max_admins = SUBSCRIPTION_LIMITS[current_level]['max_admins']
         max_users = SUBSCRIPTION_LIMITS[current_level]['max_users']
-
-        # Get current counts for the society (excluding the user being created as they are not saved yet)
         current_society_users = User.objects.filter(society=self.society)
         existing_admin_count = current_society_users.filter(is_society_admin=True).count()
         existing_total_user_count = current_society_users.count()
 
-        # Check admin limits if this new user is an admin
         if is_society_admin and existing_admin_count >= max_admins:
             self.add_error(
                 'is_society_admin',
@@ -174,7 +166,6 @@ class UserCreateForm(UserCreationForm):
                 }
             )
 
-        # Check total user limits if this new user would exceed them
         if existing_total_user_count >= max_users:
             self.add_error(
                 None, # General form error for total user count
@@ -183,7 +174,6 @@ class UserCreateForm(UserCreationForm):
                     'max': max_users
                 }
             )
-        # --- END NEW ---
 
         return cleaned_data
 
@@ -206,7 +196,6 @@ class UserUpdateForm(UserChangeForm):
         self.original_is_society_admin = kwargs.pop('original_is_society_admin', None)
         super().__init__(*args, **kwargs)
 
-        # Apply Bootstrap classes
         for field_name in ['first_name', 'last_name', 'email']:
             if field_name in self.fields:
                 self.fields[field_name].widget.attrs.update({'class': 'form-control'})
@@ -215,21 +204,15 @@ class UserUpdateForm(UserChangeForm):
             if field_name in self.fields:
                 self.fields[field_name].widget.attrs.update({'class': 'form-check-input'})
 
-        # --- NEW: Disable 'is_society_admin' if this is the ONLY admin on a 'free' plan ---
         if self.instance and self.instance.is_society_admin and \
            self.society and self.society.subscription_level == 'free':
-            # Check if this user is the only admin for their society
-            # Exclude the current user instance from the count
             other_admins_count = User.objects.filter(
                 society=self.society, is_society_admin=True
             ).exclude(pk=self.instance.pk).count()
 
             if other_admins_count == 0:
-                # If no other admins, prevent deactivating this user's admin status
                 self.fields['is_society_admin'].widget.attrs['disabled'] = True
                 self.fields['is_society_admin'].help_text = _("無料プランでは、少なくとも1人の管理者が常に必要です。別の管理者がいる場合にのみ、このユーザーの管理者ステータスを解除できます。")
-        # --- END NEW ---
-
 
     def clean(self):
         cleaned_data = super().clean()
@@ -239,18 +222,14 @@ class UserUpdateForm(UserChangeForm):
         if not self.society:
             raise forms.ValidationError(_("社会情報がフォームに渡されていません。"))
 
-        # --- NEW: Subscription Limits Validation for Update ---
         current_level = self.society.subscription_level
         max_admins = SUBSCRIPTION_LIMITS[current_level]['max_admins']
         max_users = SUBSCRIPTION_LIMITS[current_level]['max_users']
 
-        # Get counts for the society, considering the user being updated
         current_society_users_queryset = User.objects.filter(society=self.society)
 
-        # Calculate admin count *before* this user's admin status change but *after* removing this user's original status
         admin_count_excluding_current_user = current_society_users_queryset.filter(is_society_admin=True).exclude(pk=self.instance.pk).count()
 
-        # If this user is becoming an admin (and wasn't before) AND limits apply
         if not self.original_is_society_admin and is_society_admin_new_state:
             if (admin_count_excluding_current_user + 1) > max_admins:
                 self.add_error(
@@ -261,10 +240,7 @@ class UserUpdateForm(UserChangeForm):
                     }
                 )
 
-        # Total user count validation (only if user is being reactivated and total count would exceed limit)
-        # This form's primary purpose is updating existing users. The total user count isn't *incremented* by an update.
-        # However, if a user is currently inactive and is being made active, we must check.
-        if not self.instance.is_active and is_active_new_state: # User was inactive, now becoming active
+        if not self.instance.is_active and is_active_new_state:
             total_active_users_excluding_this_user = current_society_users_queryset.filter(is_active=True).exclude(pk=self.instance.pk).count()
             if (total_active_users_excluding_this_user + 1) > max_users:
                  self.add_error(
@@ -275,13 +251,9 @@ class UserUpdateForm(UserChangeForm):
                     }
                 )
 
-        # Re-check the "only admin" lockout logic on submit (backend validation)
-        # This handles cases where client-side disabling might be bypassed.
         if self.instance and self.instance.pk:
-            # If current user WAS an admin, and is NOW NOT an admin (i.e., revoking status)
             if self.original_is_society_admin and not is_society_admin_new_state:
                 if self.society and self.society.subscription_level == 'free':
-                    # Count other admins (excluding the current user, who is about to be non-admin)
                     other_admins_count_if_this_user_is_revoked = current_society_users_queryset.filter(is_society_admin=True).exclude(pk=self.instance.pk).count()
 
                     if other_admins_count_if_this_user_is_revoked == 0:
@@ -289,7 +261,6 @@ class UserUpdateForm(UserChangeForm):
                             'is_society_admin',
                             _("無料プランでは、少なくとも1人の管理者が常に必要です。このユーザーの管理者ステータスを解除するには、他の管理者がいる必要があります。")
                         )
-        # --- END NEW ---
 
         return cleaned_data
 
@@ -487,7 +458,7 @@ class ObjectUserForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         # Viewから渡される society インスタンスを取得
-        self.society = kwargs.pop('society', None) # <-- Ensure this is being popped and stored
+        self.society = kwargs.pop('society', None)
         super().__init__(*args, **kwargs)
 
         # Bootstrapクラスを適用
@@ -498,9 +469,6 @@ class ObjectUserForm(forms.ModelForm):
     def clean_name(self):
         name = self.cleaned_data['name']
 
-        # --- CRITICAL FIX HERE ---
-        # Always use the society instance passed to the form's __init__ for validation context.
-        # This 'self.society' is guaranteed to be available for both create and update operations.
         society_for_validation = self.society
 
         if not society_for_validation:
@@ -508,7 +476,6 @@ class ObjectUserForm(forms.ModelForm):
             raise forms.ValidationError(_("社会情報が見つかりません。フォームが正しく初期化されていません。"))
 
         # 同じ society 内で name の重複をチェック
-        # Use society_for_validation here
         queryset = ObjectUser.objects.filter(society=society_for_validation, name__iexact=name) # 大文字小文字を区別しない
 
         # 既存のオブジェクトを更新している場合、自分自身をチェック対象から除外
@@ -733,20 +700,15 @@ class SocietySettingsForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Apply Bootstrap's form-check-input class to checkboxes
         for field_name in ['can_manage_drawers', 'shows_drawers_in_list']:
             if field_name in self.fields:
                 self.fields[field_name].widget.attrs.update({'class': 'form-check-input'})
 
-        # --- CHANGES for subscription_level to be editable ---
         if 'subscription_level' in self.fields:
             # Remove readonly/plaintext styling. It will now be a standard select dropdown.
             # Add a Bootstrap class for select elements
             self.fields['subscription_level'].widget.attrs.update({'class': 'form-control'})
 
-        # Feature disabling logic in the __init__ remains based on the *instance's current* level
-        # This will visually disable features if the page is loaded with a certain plan.
-        # However, the `clean_` methods will enforce rules based on the *submitted* plan.
         if self.instance:
             if self.instance.subscription_level == 'free':
                 if 'can_manage_drawers' in self.fields:
@@ -764,7 +726,6 @@ class SocietySettingsForm(forms.ModelForm):
 
     def clean_can_manage_drawers(self):
         can_manage_drawers = self.cleaned_data.get('can_manage_drawers')
-        # Crucial: Check against the *submitted* (new) subscription level
         submitted_subscription_level = self.cleaned_data.get('subscription_level')
 
         if can_manage_drawers and submitted_subscription_level == 'free':
@@ -775,7 +736,6 @@ class SocietySettingsForm(forms.ModelForm):
 
     def clean_shows_drawers_in_list(self):
         shows_drawers_in_list = self.cleaned_data.get('shows_drawers_in_list')
-        # Crucial: Check against the *submitted* (new) subscription level
         submitted_subscription_level = self.cleaned_data.get('subscription_level')
 
         if shows_drawers_in_list and submitted_subscription_level == 'free':
@@ -787,6 +747,3 @@ class SocietySettingsForm(forms.ModelForm):
                 _("選択されたプランではこの機能はプレミアムプランでのみ利用可能です。")
             )
         return shows_drawers_in_list
-
-    # No custom clean_subscription_level method needed if you want it to be editable and save directly.
-    # Django's ModelForm will handle saving the selected choice.
