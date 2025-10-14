@@ -41,8 +41,8 @@ class SocietyRegistrationForm(forms.ModelForm):
         model = Society
         fields = ['name', 'slug']
         labels = {
-            'name': _('社会名'),
-            'slug': _('社会スラッグ'),
+            'name': _('会社名'),
+            'slug': _('会社スラッグ'),
         }
         help_texts = {
             'slug': _('URLに使用される、社会の一意の識別子です（例: my-company）。'),
@@ -118,7 +118,7 @@ class UserCreateForm(UserCreationForm):
             'first_name': _('名'),
             'last_name': _('姓'),
             'email': _('メールアドレス'),
-            'is_society_admin': _('社会管理者'),
+            'is_society_admin': _('会社管理者'),
             'is_active': _('有効'),
         }
         help_texts = {
@@ -144,11 +144,11 @@ class UserCreateForm(UserCreationForm):
         is_society_admin = cleaned_data.get('is_society_admin')
 
         if not self.society:
-            raise forms.ValidationError(_("社会情報がフォームに渡されていません。"))
+            raise forms.ValidationError(_("会社情報がフォームに渡されていません。"))
 
         if username and self.society:
             if User.objects.filter(society=self.society, username__iexact=username).exists():
-                self.add_error('username', _("このユーザー名は既にこの社会で使用されています。"))
+                self.add_error('username', _("このユーザー名は既にこの会社で使用されています。"))
 
         current_level = self.society.subscription_level
         max_admins = SUBSCRIPTION_LIMITS[current_level]['max_admins']
@@ -186,7 +186,7 @@ class UserUpdateForm(UserChangeForm):
             'first_name': _('名'),
             'last_name': _('姓'),
             'email': _('メールアドレス'),
-            'is_society_admin': _('社会管理者'),
+            'is_society_admin': _('会社管理者'),
             'is_active': _('有効'),
         }
 
@@ -220,7 +220,7 @@ class UserUpdateForm(UserChangeForm):
         is_active_new_state = cleaned_data.get('is_active') # The NEW state from form
 
         if not self.society:
-            raise forms.ValidationError(_("社会情報がフォームに渡されていません。"))
+            raise forms.ValidationError(_("会社情報がフォームに渡されていません。"))
 
         current_level = self.society.subscription_level
         max_admins = SUBSCRIPTION_LIMITS[current_level]['max_admins']
@@ -270,7 +270,7 @@ class CustomAuthenticationForm(AuthenticationForm):
     DjangoのAuthenticationFormを継承し、society_nameフィールドを追加します。
     """
     society_name = forms.CharField(
-        label=_("社会名"),
+        label=_("会社名"),
         max_length=255,
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('あなたの会社の名前')}),
         help_text=_("所属する社会の正確な名前を入力してください。"),
@@ -307,7 +307,7 @@ class CustomAuthenticationForm(AuthenticationForm):
             except Society.DoesNotExist:
                 # AuthenticationFormのcleaned_dataからエラーを削除し、
                 # 新しいエラーを追加してフィールドに紐づける
-                self.add_error('society_name', _("指定された社会が見つかりません。"))
+                self.add_error('society_name', _("指定された会社が見つかりません。"))
                 # AuthenticationFormがis_valid()で認証失敗と判断した場合は
                 # user_cacheがNoneになるので、それをクリアして認証失敗の状態を維持
                 if hasattr(self, 'user_cache'):
@@ -473,7 +473,7 @@ class ObjectUserForm(forms.ModelForm):
 
         if not society_for_validation:
             # This should ideally not happen if get_form_kwargs is properly implemented
-            raise forms.ValidationError(_("社会情報が見つかりません。フォームが正しく初期化されていません。"))
+            raise forms.ValidationError(_("会社情報が見つかりません。フォームが正しく初期化されていません。"))
 
         # 同じ society 内で name の重複をチェック
         queryset = ObjectUser.objects.filter(society=society_for_validation, name__iexact=name) # 大文字小文字を区別しない
@@ -694,7 +694,7 @@ class SocietySettingsForm(forms.ModelForm):
         help_texts = {
             'can_manage_drawers': _('このオプションを有効にすると、在庫品目を個々の引き出しに割り当てることができます。'),
             'shows_drawers_in_list': _('有効にすると、在庫リストで各品目の引き出し配置情報が表示されます。'),
-            'subscription_level': _('社会の現在のサブスクリプションレベルです。管理者によってのみ変更可能です。'),
+            'subscription_level': _('会社の現在のサブスクリプションレベルです。管理者によってのみ変更可能です。'),
         }
 
     def __init__(self, *args, **kwargs):
@@ -747,3 +747,4 @@ class SocietySettingsForm(forms.ModelForm):
                 _("選択されたプランではこの機能はプレミアムプランでのみ利用可能です。")
             )
         return shows_drawers_in_list
+
