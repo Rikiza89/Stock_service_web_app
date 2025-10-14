@@ -1,0 +1,45 @@
+{% extends 'stock_service/app_base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "在庫移動履歴" %}{% endblock %}
+
+{% block content %}
+{% if movements %}
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead class="thead-dark">
+            <tr>
+                <th>{% trans "品目名" %}</th>
+                <th>{% trans "移動タイプ" %}</th>
+                <th>{% trans "数量" %}</th>
+                <th>{% trans "移動者" %}</th>
+                <th>{% trans "日時" %}</th>
+                <th>{% trans "引き出し" %}</th>
+                <th>{% trans "備考" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for movement in movements %}
+            <tr>
+                <td><a href="{% url 'stock_service:stock_object_detail_stock_service' movement.stock_object.pk %}">{{ movement.stock_object.name }}</a></td>
+                <td>
+                    <span class="badge badge-{% if movement.movement_type == 'in' %}success{% else %}danger{% endif %}">
+                        {{ movement.get_movement_type_display }}
+                    </span>
+                </td>
+                <td>{{ movement.quantity }}</td>
+                <td>{{ movement.moved_by.username|default:_("N/A") }}</td>
+                <td>{{ movement.timestamp|date:"Y年m月d日 H時i分s秒" }}</td>
+                <td>{{ movement.drawer_involved|default:"-" }}</td>
+                <td>{{ movement.notes|default:"-" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info" role="alert">
+    {% trans "在庫の移動履歴はありません。" %}
+</div>
+{% endif %}
+{% endblock %}

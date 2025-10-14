@@ -1,0 +1,33 @@
+{% extends 'stock_service/app_base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "ユーザーの削除" %}{% endblock %}
+
+{% block content %}
+
+<div class="card shadow-sm">
+<div class="card-header bg-danger text-white">
+<h4 class="mb-0"><i class="fas fa-exclamation-triangle mr-2"></i> {% trans "削除確認" %}</h4>
+</div>
+<div class="card-body">
+<p>{% trans "本当にこのユーザーを削除しますか？" %}</p>
+<div class="alert alert-warning" role="alert">
+{% trans "この操作は元に戻せません。" %}
+<br>
+{% trans "削除対象" %}:
+<ul>
+<li><strong>{% trans "ユーザー名" %}:</strong> {{ user_obj.username }}</li>
+<li><strong>{% trans "氏名" %}:</strong> {{ user_obj.get_full_name|default:"-" }}</li>
+<li><strong>{% trans "メールアドレス" %}:</strong> {{ user_obj.email|default:"-" }}</li>
+<li><strong>{% trans "社会管理者" %}:</strong> {% if user_obj.is_society_admin %}{% trans "はい" %}{% else %}{% trans "いいえ" %}{% endif %}</li>
+</ul>
+<p class="mt-2"><strong>{% trans "注意" %}:</strong> {% trans "このユーザーに関連付けられている全ての在庫使用履歴は、ユーザー情報が削除されても残りますが、使用者情報は「削除済みユーザー」として表示される場合があります。" %}</p>
+</div>
+<form method="post">
+{% csrf_token %}
+<button type="submit" class="btn btn-danger mt-3"><i class="fas fa-trash"></i> {% trans "削除" %}</button>
+<a href="{% url 'stock_service:user_list' %}" class="btn btn-secondary mt-3 ml-2">{% trans "キャンセル" %}</a>
+</form>
+</div>
+</div>
+{% endblock %}

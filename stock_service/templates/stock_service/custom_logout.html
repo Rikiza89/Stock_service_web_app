@@ -1,0 +1,21 @@
+{% extends 'stock_service/app_base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "ログアウト" %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 text-center">
+        <div class="card shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">{% trans "ログアウトしました" %}</h4>
+            </div>
+            <div class="card-body">
+                <p class="lead">{% trans "正常にログアウトしました。" %}</p>
+                <a href="{% url 'stock_service:custom_login_stock_service' %}" class="btn btn-primary">{% trans "再度ログイン" %}</a>
+                <a href="{% url 'stock_service:register_society_stock_service' %}" class="btn btn-outline-secondary ml-2">{% trans "新しい社会を登録" %}</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

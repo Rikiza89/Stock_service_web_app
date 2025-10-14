@@ -1,0 +1,79 @@
+{% extends 'stock_service/app_base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "社会設定" %}{% endblock %}
+
+{% block content %}
+
+{# Display messages (e.g., success/error from saving settings) #}
+{% if messages %}
+    <div class="alert-container">
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0"><i class="fas fa-cogs mr-2"></i> {% trans "社会設定" %} ({{ society.name }})</h4>
+    </div>
+    <div class="card-body">
+        <div class="mb-4">
+            <h5>{% trans "現在のプラン" %}: <span class="badge badge-info">{{ current_subscription_plan }}</span></h5>
+            <p class="text-muted">{% trans "より高度な機能を利用するには、プランをアップグレードしてください。" %}</p>
+            <a href="{% url 'stock_service:pricing_stock_service' %}" class="btn btn-sm btn-outline-info">
+                <i class="fas fa-star mr-1"></i> {% trans "料金プランを確認・アップグレード" %}
+            </a>
+        </div>
+
+        <hr>
+
+        <form method="post" class="needs-validation" novalidate>
+            {% csrf_token %}
+            {% for field in form %}
+                <div class="form-group {% if field.field.widget.input_type == 'checkbox' %}form-check{% endif %}">
+                    {% if field.field.widget.input_type == 'checkbox' %}
+                        {# Render checkbox with its disabled state if set by the form #}
+                        <input type="checkbox" 
+                               class="form-check-input" 
+                               id="{{ field.id_for_label }}" 
+                               name="{{ field.html_name }}" 
+                               {% if field.value %}checked{% endif %} 
+                               {% if field.field.widget.attrs.disabled %}disabled{% endif %}>
+                        <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        
+                        {# Display help text or specific message for disabled fields #}
+                        {% if field.field.widget.attrs.disabled %}
+                            <small class="text-danger d-block">{{ field.help_text }}</small>
+                        {% else %}
+                            {% if field.help_text %}
+                                <small class="form-text text-muted">{{ field.help_text }}</small>
+                            {% endif %}
+                        {% endif %}
+                    {% else %}
+                        {# Render all other fields, including subscription_level, normally. #}
+                        {# subscription_level will now render as a <select> due to CharField with choices #}
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }} {# This will now render the <select> element for subscription_level #}
+                        {% if field.help_text %}
+                            <small class="form-text text-muted">{{ field.help_text }}</small>
+                        {% endif %}
+                    {% endif %}
+                    {% for error in field.errors %}
+                        <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+
+            <button type="submit" class="btn btn-primary mt-3"><i class="fas fa-save"></i> {% trans "設定を保存" %}</button>
+            <a href="{% url 'stock_service:app_home_stock_service' %}" class="btn btn-secondary mt-3 ml-2">{% trans "キャンセル" %}</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

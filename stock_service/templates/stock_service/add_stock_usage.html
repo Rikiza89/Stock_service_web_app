@@ -1,0 +1,31 @@
+{% extends 'stock_service/app_base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "利用履歴を記録" %}{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0"><i class="fas fa-plus-circle mr-2"></i> {% trans "利用履歴を記録" %}</h4>
+    </div>
+    <div class="card-body">
+        <form method="post" class="needs-validation" novalidate>
+            {% csrf_token %}
+            {% for field in form %}
+                <div class="form-group">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}
+                        <small class="form-text text-muted">{{ field.help_text }}</small>
+                    {% endif %}
+                    {% for error in field.errors %}
+                        <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-primary mt-3"><i class="fas fa-save"></i> {% trans "保存" %}</button>
+            <a href="{% url 'stock_service:object_user_usage_log_stock_service' %}" class="btn btn-secondary mt-3 ml-2">{% trans "キャンセル" %}</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

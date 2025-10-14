@@ -1,0 +1,112 @@
+{% extends 'stock_service/app_base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "ダッシュボード" %}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="alert alert-info" role="alert">
+            {% trans "現在、" %}<strong>{{ society.name }}</strong> {% trans "社会としてログインしています。" %}
+            {% if user.is_society_admin %}<br>{% trans "あなたは社会管理者です。" %}{% endif %}
+            <br>
+            {% if society.subscription_level == 'free' %}
+                {% trans "現在のプラン：無料" %}. <a href="{% url 'stock_service:pricing_stock_service' %}">{% trans "プランをアップグレード" %}</a>
+            {% elif society.subscription_level == 'basic' %}
+                {% trans "現在のプラン：ベーシック" %}. <a href="{% url 'stock_service:pricing_stock_service' %}">{% trans "プランをアップグレード" %}</a>
+            {% elif society.subscription_level == 'premium' %}
+                {% trans "現在のプラン：プレミアム" %}.
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h5 class="card-title text-primary"><i class="fas fa-boxes mr-2"></i> {% trans "総在庫品目数" %}</h5>
+                <p class="card-text display-4">{{ total_stock_objects }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h5 class="card-title text-warning"><i class="fas fa-exclamation-triangle mr-2"></i> {% trans "低在庫品目" %}</h5>
+                <p class="card-text display-4">{{ low_stock_objects }}</p>
+                <a href="{% url 'stock_service:stock_object_list_stock_service' %}" class="card-link">{% trans "詳細を見る" %}</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h5 class="card-title text-success"><i class="fas fa-calendar-check mr-2"></i> {% trans "今後の補充予定" %}</h5>
+                <p class="card-text display-4">{{ upcoming_refills|length }}</p>
+                <a href="{% url 'stock_service:refill_scheduler_stock_service_general' %}" class="card-link">{% trans "詳細を見る" %}</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-history mr-2"></i> {% trans "最近の在庫移動" %}</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_movements %}
+                <ul class="list-group list-group-flush">
+                    {% for movement in recent_movements %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ movement.stock_object.name }}</strong> ({{ movement.get_movement_type_display }})
+                            <br>
+                            <small class="text-muted">{% trans "数量" %}: {{ movement.quantity }} {% trans "個" %} - {{ movement.timestamp|date:"Y年m月d日 H時i分" }}</small>
+                        </div>
+                        <span class="badge badge-{% if movement.movement_type == 'in' %}success{% else %}danger{% endif %} badge-pill">{{ movement.get_movement_type_display }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="text-right mt-3">
+                    <a href="{% url 'stock_service:stock_movement_log_stock_service' %}" class="btn btn-sm btn-outline-primary">{% trans "全ての移動履歴を見る" %}</a>
+                </div>
+                {% else %}
+                <p class="text-muted">{% trans "最近の在庫移動はありません。" %}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-calendar-alt mr-2"></i> {% trans "今後の補充スケジュール" %}</h5>
+            </div>
+            <div class="card-body">
+                {% if upcoming_refills %}
+                <ul class="list-group list-group-flush">
+                    {% for refill in upcoming_refills %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ refill.stock_object.name }}</strong>
+                            <br>
+                            <small class="text-muted">{% trans "予定日" %}: {{ refill.scheduled_date|date:"Y年m月d日" }} - {% trans "数量" %}: {{ refill.quantity_to_refill }} {% trans "個" %}</small>
+                        </div>
+                        <span class="badge badge-info badge-pill">{% trans "予定" %}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="text-right mt-3">
+                    <a href="{% url 'stock_service:refill_scheduler_stock_service_general' %}" class="btn btn-sm btn-outline-success">{% trans "全てのスケジュールを見る" %}</a>
+                </div>
+                {% else %}
+                <p class="text-muted">{% trans "今後の補充スケジュールはありません。" %}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

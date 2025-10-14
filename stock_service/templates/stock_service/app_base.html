@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{% endblock %} | 在庫管理システム - Stock Service</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            min-height: 100vh;
+            flex-direction: column;
+            background-color: #f8f9fa;
+            overflow-x: hidden;
+        }
+        #wrapper {
+            display: flex;
+            width: 100%;
+            flex-grow: 1;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Sidebar Styles */
+        #sidebar-wrapper {
+            min-width: 250px;
+            max-width: 250px;
+            background: #343a40;
+            color: #fff;
+            transition: all 0.3s ease-in-out;
+            z-index: 1030;
+            flex-shrink: 0;
+        }
+
+        /* Content Area Styles */
+        #page-content-wrapper {
+            width: 100%;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.05);
+            margin: 20px;
+            flex-grow: 1;
+            transition: all 0.3s ease-in-out;
+        }
+
+        /* Mobile Styles */
+        @media (max-width: 768px) {
+            #wrapper {
+                flex-direction: column;
+            }
+
+            #sidebar-wrapper {
+                position: fixed;
+                top: 0;
+                left: -250px; /* Hidden off-screen initially */
+                min-width: 250px;
+                max-width: 250px;
+                height: 100vh;
+                overflow-y: auto;
+                z-index: 1040;
+                box-shadow: 0 0 15px rgba(0,0,0,0.3);
+                transform: translateX(0);
+                transition: transform 0.3s ease-in-out;
+            }
+
+            /* Show sidebar when toggled */
+            #wrapper.toggled #sidebar-wrapper {
+                transform: translateX(250px);
+            }
+
+            #page-content-wrapper {
+                margin: 0;
+                border-radius: 0;
+                box-shadow: none;
+                padding: 15px;
+                position: relative;
+                min-height: 100vh;
+            }
+
+            /* Overlay effect when sidebar is open on mobile */
+            #wrapper.toggled::before {
+                content: '';
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: rgba(0, 0, 0, 0.5);
+                z-index: 1035;
+                pointer-events: auto;
+            }
+
+            /* Menu toggle button styles for mobile */
+            #menu-toggle {
+                border: 2px solid #007bff;
+                color: #007bff;
+                background: white;
+                transition: all 0.3s ease;
+            }
+
+            #menu-toggle:hover {
+                background-color: #007bff;
+                color: white;
+            }
+
+            #menu-toggle.active {
+                background-color: #dc3545;
+                border-color: #dc3545;
+                color: white;
+            }
+
+            /* Mobile navbar adjustments */
+            .navbar {
+                flex-wrap: nowrap;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            /* Mobile user menu container */
+            .mobile-user-menu {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .mobile-user-info {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                font-size: 0.85rem;
+                color: #6c757d;
+                margin-right: 10px;
+            }
+
+            .mobile-user-name {
+                font-weight: bold;
+                color: #343a40;
+            }
+
+            .mobile-society-name {
+                font-size: 0.75rem;
+                color: #6c757d;
+            }
+
+            /* Mobile action buttons */
+            .mobile-actions {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .mobile-btn {
+                padding: 6px 12px;
+                font-size: 0.8rem;
+                border-radius: 4px;
+                text-decoration: none;
+                transition: all 0.3s ease;
+                white-space: nowrap;
+            }
+
+            .mobile-btn-profile {
+                background-color: #28a745;
+                color: white;
+                border: 1px solid #28a745;
+            }
+
+            .mobile-btn-profile:hover {
+                background-color: #218838;
+                color: white;
+                text-decoration: none;
+            }
+
+            .mobile-btn-logout {
+                background-color: #dc3545;
+                color: white;
+                border: 1px solid #dc3545;
+            }
+
+            .mobile-btn-logout:hover {
+                background-color: #c82333;
+                color: white;
+                text-decoration: none;
+            }
+
+            .mobile-btn-login {
+                background-color: #007bff;
+                color: white;
+                border: 1px solid #007bff;
+            }
+
+            .mobile-btn-login:hover {
+                background-color: #0056b3;
+                color: white;
+                text-decoration: none;
+            }
+
+            /* Hide desktop dropdown on mobile */
+            .navbar-nav.ml-auto {
+                display: none !important;
+            }
+        }
+
+        /* Desktop styles */
+        @media (min-width: 769px) {
+            #sidebar-wrapper.toggled {
+                margin-left: -250px;
+            }
+
+            .navbar-nav.ml-auto {
+                display: flex !important;
+            }
+
+            #menu-toggle {
+                display: none !important;
+            }
+
+            /* Hide mobile-specific elements on desktop */
+            .mobile-user-menu {
+                display: none !important;
+            }
+        }
+
+        /* General styling */
+        .sidebar-heading {
+            padding: 1rem;
+            font-size: 1.2rem;
+            color: #f8f9fa;
+            border-bottom: 1px solid rgba(255,255,255,.1);
+            text-align: center;
+        }
+        .list-group-item {
+            background-color: #343a40;
+            color: #adb5bd;
+            border: none;
+            padding: 12px 15px;
+            font-size: 1.05rem;
+        }
+        .list-group-item:hover {
+            background-color: #495057;
+            color: #fff;
+            text-decoration: none;
+        }
+        .list-group-item.active {
+            background-color: #007bff;
+            color: #fff;
+            border-left: 3px solid #fff;
+        }
+        .list-group-item i {
+            margin-right: 10px;
+        }
+        .navbar {
+            padding: 1rem 1.5rem;
+            background-color: #ffffff;
+            border-bottom: 1px solid #e0e0e0;
+            box-shadow: 0 2px 4px rgba(0,0,0,.04);
+            margin-bottom: 20px;
+        }
+        .navbar .navbar-brand {
+            font-weight: bold;
+            color: #343a40;
+        }
+        .navbar .nav-link {
+            color: #6c757d;
+        }
+        .navbar .nav-link:hover {
+            color: #007bff;
+        }
+        .footer {
+            width: 100%;
+            padding: 20px;
+            text-align: center;
+            background-color: #e9ecef;
+            color: #6c757d;
+            margin-top: auto;
+            border-top: 1px solid #dee2e6;
+        }
+        .messages {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 20px;
+        }
+        .messages li {
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .messages .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .messages .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .messages .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        .messages .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        /* Prevent body scroll when sidebar is open on mobile */
+        body.sidebar-open {
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div id="wrapper">
+        <div id="sidebar-wrapper">
+            <div class="sidebar-heading">Stock Service</div>
+            <div class="list-group list-group-flush">
+                {% if user.is_authenticated %}
+                    <a href="{% url 'stock_service:app_home_stock_service' %}" class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'app_home_stock_service' %}active{% endif %}">
+                        <i class="fas fa-tachometer-alt"></i> ダッシュボード
+                    </a>
+                    <a href="{% url 'stock_service:stock_object_list_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_object_list' in request.resolver_match.url_name or 'stock_object_detail' in request.resolver_match.url_name or 'add_stock_object' in request.resolver_match.url_name or 'update_stock_object' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-boxes"></i> 在庫品目
+                    </a>
+                    <a href="{% url 'stock_service:stock_out_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_out' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-minus-circle"></i> 在庫出庫
+                    </a>
+                    <a href="{% url 'stock_service:stock_in_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_in' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-plus-circle"></i> 在庫入庫
+                    </a>
+                    <a href="{% url 'stock_service:stock_movement_log_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_movement_log' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-history"></i> 在庫移動履歴
+                    </a>
+                    {% if user.is_society_admin %} {# Assuming only society admins can manage ObjectUsers #}
+                    <a href="{% url 'stock_service:objectuser_list' %}" class="list-group-item list-group-item-action {% if 'objectuser' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-users mr-1"></i> 利用ユーザー<br>（部署/機械）
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'stock_service:object_user_usage_log_stock_service' %}" class="list-group-item list-group-item-action {% if 'object_user_usage_log' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-users"></i> 利用履歴
+                    </a>
+                    <a href="{% url 'stock_service:refill_prediction_stock_service' %}" class="list-group-item list-group-item-action {% if 'refill_prediction' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-chart-line"></i> 補充予測
+                    </a>
+                    <a href="{% url 'stock_service:refill_scheduler_stock_service_general' %}" class="list-group-item list-group-item-action {% if 'refill_scheduler' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-calendar-alt"></i> 補充スケジューラー
+                    </a>
+                    <a href="{% url 'stock_service:stock_object_kind_list_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_object_kind_list' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-tags"></i> 品目種類管理
+                    </a>
+                    {% if user.society.can_manage_drawers %}
+                    <a href="{% url 'stock_service:manage_drawers_stock_service' %}" class="list-group-item list-group-item-action {% if 'manage_drawers' in request.resolver_match.url_name or 'assign_stock_to_drawer' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-th-large"></i> 引き出し管理
+                    </a>
+                    {% endif %}
+
+                    {% if user.is_society_admin %}
+                    <a href="{% url 'stock_service:society_settings_stock_service' %}" class="list-group-item list-group-item-action {% if 'society_settings' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-cogs"></i> 会社設定
+                    </a>
+                    {% endif %}
+                    {% else %}
+                    <a href="{% url 'stock_service:custom_login_stock_service' %}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-sign-in-alt"></i> ログイン
+                    </a>
+                    <a href="{% url 'stock_service:register_society_stock_service' %}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-user-plus"></i> 会社登録
+                    </a>
+                    <a href="{% url 'stock_service:pricing_stock_service' %}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-dollar-sign"></i> 料金プラン
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+        <div id="page-content-wrapper">
+            <nav class="navbar navbar-expand-lg navbar-light bg-light">
+                <button class="btn btn-outline-primary d-md-none" id="menu-toggle">
+                    <i class="fas fa-bars"></i> <span class="menu-text">メニュー</span>
+                </button>
+
+                <!-- Mobile User Menu (shown only on mobile) -->
+                <div class="mobile-user-menu d-md-none">
+                    {% if user.is_authenticated %}
+                        <div class="mobile-user-info">
+                            <div class="mobile-user-name">{{ user.username }}</div>
+                            <div class="mobile-society-name">{{ user.society.name }}</div>
+                        </div>
+                        {% if user.is_society_admin %}
+                            <a href="{% url 'stock_service:user_list' %}" class="mobile-btn mobile-btn-profile">
+                                <i class="fas fa-user"></i>
+                            </a>
+                        {% endif %}
+                        <div class="mobile-actions">
+                            <a href="{% url 'stock_service:user_profile_stock_service' %}" class="mobile-btn mobile-btn-profile">
+                                <i class="fas fa-user"></i>
+                            </a>
+                            <a href="{% url 'stock_service:custom_logout_stock_service' %}" class="mobile-btn mobile-btn-logout">
+                                <i class="fas fa-sign-out-alt"></i>
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="mobile-actions">
+                            <a href="{% url 'stock_service:custom_login_stock_service' %}" class="mobile-btn mobile-btn-login">
+                                <i class="fas fa-sign-in-alt"></i> ログイン
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Desktop dropdown menu (shown only on desktop) -->
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <ul class="navbar-nav ml-auto mt-2 mt-lg-0">
+                        {% if user.is_authenticated %}
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <i class="fas fa-user-circle"></i> {{ user.username }} ({{ user.society.name }})
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdown">
+                                {% if user.is_society_admin %}
+                                    <a class="dropdown-item" href="{% url 'stock_service:user_list' %}">
+                                        <i class="fas fa-user"></i> ユーザーリスト
+                                    </a>
+                                {% endif %}
+                                    <a class="dropdown-item" href="{% url 'stock_service:user_profile_stock_service' %}">
+                                        <i class="fas fa-user"></i> プロフィール
+                                    </a>
+                                    <div class="dropdown-divider"></div>
+                                    <a class="dropdown-item" href="{% url 'stock_service:custom_logout_stock_service' %}">
+                                        <i class="fas fa-sign-out-alt"></i> ログアウト
+                                    </a>
+                                </div>
+                            </li>
+                        {% else %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'stock_service:custom_login_stock_service' %}">ログイン</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </nav>
+
+            <div class="container-fluid">
+                {% if messages %}
+                    <ul class="messages">
+                        {% for message in messages %}
+                            <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                <h1 class="mb-4">{{ title }}</h1>
+                {% block content %}
+                {% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 Stock Service. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            // Function to close sidebar
+            function closeSidebar() {
+                $("#wrapper").removeClass("toggled");
+                $("#menu-toggle").removeClass("active");
+                $("body").removeClass("sidebar-open");
+                // Update button text
+                $("#menu-toggle .menu-text").text("メニュー");
+            }
+
+            // Function to open sidebar
+            function openSidebar() {
+                $("#wrapper").addClass("toggled");
+                $("#menu-toggle").addClass("active");
+                $("body").addClass("sidebar-open");
+                // Update button text
+                $("#menu-toggle .menu-text").text("閉じる");
+            }
+
+            // Toggle sidebar when menu button is clicked
+            $("#menu-toggle").click(function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if ($("#wrapper").hasClass("toggled")) {
+                    closeSidebar();
+                } else {
+                    openSidebar();
+                }
+            });
+
+            // Close sidebar when a menu item is clicked (on mobile)
+            $("#sidebar-wrapper .list-group-item").click(function() {
+                if (window.innerWidth <= 768) {
+                    closeSidebar();
+                }
+            });
+
+            // Close sidebar when clicking on the overlay (outside sidebar)
+            $(document).click(function(e) {
+                if (window.innerWidth <= 768 && $("#wrapper").hasClass("toggled")) {
+                    // Check if click is outside sidebar and menu button
+                    if (!$(e.target).closest('#sidebar-wrapper').length &&
+                        !$(e.target).closest('#menu-toggle').length) {
+                        closeSidebar();
+                    }
+                }
+            });
+
+            // Handle window resize
+            $(window).resize(function() {
+                if (window.innerWidth > 768) {
+                    // On desktop, ensure sidebar is visible and reset mobile states
+                    $("#wrapper").removeClass("toggled");
+                    $("#menu-toggle").removeClass("active");
+                    $("body").removeClass("sidebar-open");
+                } else {
+                    // On mobile, ensure sidebar is hidden by default
+                    if (!$("#wrapper").hasClass("toggled")) {
+                        closeSidebar();
+                    }
+                }
+            });
+
+            // Initialize state on page load
+            if (window.innerWidth <= 768) {
+                closeSidebar(); // Ensure sidebar is hidden by default on mobile
+            }
+        });
+    </script>
+</body>
+</html>

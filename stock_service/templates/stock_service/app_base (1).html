@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{% endblock %} | 在庫管理システム - Stock Service</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            min-height: 100vh;
+            flex-direction: column;
+            background-color: #f8f9fa;
+        }
+        #wrapper {
+            display: flex;
+            width: 100%;
+            flex-grow: 1;
+        }
+        #sidebar-wrapper {
+            min-width: 250px;
+            max-width: 250px;
+            background: #343a40;
+            color: #fff;
+            transition: all 0.3s;
+        }
+        #sidebar-wrapper.toggled {
+            margin-left: -250px;
+        }
+        #page-content-wrapper {
+            width: 100%;
+            padding: 20px;
+            background-color: #fff; /* White background for content */
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.05);
+            margin: 20px;
+            flex-grow: 1;
+        }
+        .sidebar-heading {
+            padding: 1rem;
+            font-size: 1.2rem;
+            color: #f8f9fa;
+            border-bottom: 1px solid rgba(255,255,255,.1);
+            text-align: center;
+        }
+        .list-group-item {
+            background-color: #343a40;
+            color: #adb5bd;
+            border: none;
+            padding: 12px 15px;
+            font-size: 1.05rem;
+        }
+        .list-group-item:hover {
+            background-color: #495057;
+            color: #fff;
+            text-decoration: none;
+        }
+        .list-group-item.active {
+            background-color: #007bff;
+            color: #fff;
+            border-left: 3px solid #fff;
+        }
+        .list-group-item i {
+            margin-right: 10px;
+        }
+        .navbar {
+            padding: 1rem 1.5rem;
+            background-color: #ffffff;
+            border-bottom: 1px solid #e0e0e0;
+            box-shadow: 0 2px 4px rgba(0,0,0,.04);
+            margin-bottom: 20px;
+        }
+        .navbar .navbar-brand {
+            font-weight: bold;
+            color: #343a40;
+        }
+        .navbar .nav-link {
+            color: #6c757d;
+        }
+        .navbar .nav-link:hover {
+            color: #007bff;
+        }
+        .footer {
+            width: 100%;
+            padding: 20px;
+            text-align: center;
+            background-color: #e9ecef;
+            color: #6c757d;
+            margin-top: auto;
+            border-top: 1px solid #dee2e6;
+        }
+        .messages {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 20px;
+        }
+        .messages li {
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .messages .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .messages .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .messages .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        .messages .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <div id="wrapper">
+        <div id="sidebar-wrapper">
+            <div class="sidebar-heading">Stock Service</div>
+            <div class="list-group list-group-flush">
+                {% if user.is_authenticated %}
+                    <a href="{% url 'stock_service:app_home_stock_service' %}" class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'app_home_stock_service' %}active{% endif %}">
+                        <i class="fas fa-tachometer-alt"></i> ダッシュボード
+                    </a>
+                    <a href="{% url 'stock_service:stock_object_list_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_object_list' in request.resolver_match.url_name or 'stock_object_detail' in request.resolver_match.url_name or 'add_stock_object' in request.resolver_match.url_name or 'update_stock_object' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-boxes"></i> 在庫品目
+                    </a>
+                    <a href="{% url 'stock_service:stock_out_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_out' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-minus-circle"></i> 在庫出庫
+                    </a>
+                    <a href="{% url 'stock_service:stock_in_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_in' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-plus-circle"></i> 在庫入庫
+                    </a>
+                    <a href="{% url 'stock_service:stock_movement_log_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_movement_log' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-history"></i> 在庫移動履歴
+                    </a>
+                    <a href="{% url 'stock_service:object_user_usage_log_stock_service' %}" class="list-group-item list-group-item-action {% if 'object_user_usage_log' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-users"></i> 利用履歴
+                    </a>
+                    <a href="{% url 'stock_service:refill_prediction_stock_service' %}" class="list-group-item list-group-item-action {% if 'refill_prediction' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-chart-line"></i> 補充予測
+                    </a>
+                    <a href="{% url 'stock_service:refill_scheduler_stock_service_general' %}" class="list-group-item list-group-item-action {% if 'refill_scheduler' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-calendar-alt"></i> 補充スケジューラー
+                    </a>
+                    <a href="{% url 'stock_service:stock_object_kind_list_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_object_kind_list' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-tags"></i> 品目種類管理
+                    </a>
+                    {% if user.society.can_manage_drawers %}
+                    <a href="{% url 'stock_service:manage_drawers_stock_service' %}" class="list-group-item list-group-item-action {% if 'manage_drawers' in request.resolver_match.url_name or 'assign_stock_to_drawer' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-th-large"></i> 引き出し管理
+                    </a>
+                    {% endif %}
+                    {% if user.is_society_admin %}
+                    <a href="{% url 'stock_service:society_settings_stock_service' %}" class="list-group-item list-group-item-action {% if 'society_settings' in request.resolver_match.url_name %}active{% endif %}">
+                        <i class="fas fa-cogs"></i> 社会設定
+                    </a>
+                    {% endif %}
+                {% else %}
+                    <a href="{% url 'stock_service:custom_login_stock_service' %}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-sign-in-alt"></i> ログイン
+                    </a>
+                    <a href="{% url 'stock_service:register_society_stock_service' %}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-user-plus"></i> 社会登録
+                    </a>
+                    <a href="{% url 'stock_service:pricing_stock_service' %}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-dollar-sign"></i> 料金プラン
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+        <div id="page-content-wrapper">
+            <nav class="navbar navbar-expand-lg navbar-light bg-light">
+                <button class="btn btn-outline-primary" id="menu-toggle"><i class="fas fa-bars"></i> メニュー</button>
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <ul class="navbar-nav ml-auto mt-2 mt-lg-0">
+                        {% if user.is_authenticated %}
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <i class="fas fa-user-circle"></i> {{ user.username }} ({{ user.society.name }})
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdown">
+                                    <a class="dropdown-item" href="#">プロフィール</a> {# Placeholder for user profile #}
+                                    <div class="dropdown-divider"></div>
+                                    <a class="dropdown-item" href="{% url 'stock_service:custom_logout_stock_service' %}">ログアウト</a>
+                                </div>
+                            </li>
+                        {% else %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'stock_service:custom_login_stock_service' %}">ログイン</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </nav>
+
+            <div class="container-fluid">
+                {% if messages %}
+                    <ul class="messages">
+                        {% for message in messages %}
+                            <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                <h1 class="mb-4">{{ title }}</h1>
+                {% block content %}
+                {% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 Stock Service. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        $("#menu-toggle").click(function(e) {
+            e.preventDefault();
+            $("#wrapper").toggleClass("toggled");
+        });
+    </script>
+</body>
+</html>

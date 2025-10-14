@@ -1,0 +1,95 @@
+{% extends 'stock_service/app_base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "在庫品目リスト" %}{% endblock %}
+
+{% block content %}
+<div class="mb-4 d-flex justify-content-between align-items-center">
+    <a href="{% url 'stock_service:add_stock_object_stock_service' %}" class="btn btn-primary">
+        <i class="fas fa-plus-circle"></i> {% trans "新しい品目を追加" %}
+    </a>
+    <a href="{% url 'stock_service:stock_object_kind_list_stock_service' %}" class="btn btn-secondary ml-2">
+        <i class="fas fa-tags"></i> {% trans "品目種類を管理" %}
+    </a>
+</div>
+
+{% if stock_objects %}
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead class="thead-dark">
+            <tr>
+                <th>{% trans "品目名" %}</th>
+                <th>{% trans "種類" %}</th>
+                <th>{% trans "現在の数量" %}</th>
+                <th>{% trans "最低数量" %}</th>
+                <th>{% trans "単位" %}</th>
+                <th>{% trans "保管場所" %}</th>
+                {% if can_manage_drawers and shows_drawers_in_list %}
+                <th>{% trans "引き出し情報" %}</th>
+                {% endif %}
+                <th>{% trans "状態" %}</th>
+                <th>{% trans "アクション" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for obj in stock_objects %}
+            <tr class="{% if obj.current_quantity <= obj.minimum_quantity %}table-warning{% endif %}">
+                <td><a href="{% url 'stock_service:stock_object_detail_stock_service' obj.pk %}">{{ obj.name }}</a></td>
+                <td>{{ obj.kind.name|default:"-" }}</td>
+                <td>{{ obj.current_quantity }}</td>
+                <td>{{ obj.minimum_quantity }}</td>
+                <td>{{ obj.unit|default:"-" }}</td>
+                <td>
+                    {% if not can_manage_drawers or not shows_drawers_in_list %}
+                        {{ obj.location_description|default:"-" }}
+                    {% else %}
+                        {# 引き出し管理が有効で、リストに表示する場合、ここに引き出し情報を表示 #}
+                        {% if obj.drawer_info %}
+                            {% for placement in obj.drawer_info %}
+                                <div>{{ placement.drawer.cabinet_name }}{{ placement.drawer.drawer_letter_x }}{{ placement.drawer.drawer_number_y }} (x{{ placement.quantity }})</div>
+                            {% empty %}
+                                {% if obj.location_description %}{{ obj.location_description }}{% else %}-{% endif %}
+                            {% endfor %}
+                        {% else %}
+                            {% if obj.location_description %}{{ obj.location_description }}{% else %}-{% endif %}
+                        {% endif %}
+                    {% endif %}
+                </td>
+                {% if can_manage_drawers and shows_drawers_in_list %}
+                <td>
+                    {% if obj.drawer_info %}
+                        {% for placement in obj.drawer_info %}
+                            <div>{{ placement.drawer.cabinet_name }}{{ placement.drawer.drawer_letter_x }}{{ placement.drawer.drawer_number_y }} (x{{ placement.quantity }})</div>
+                        {% empty %}
+                            {% trans "引き出し未割り当て" %}
+                        {% endfor %}
+                    {% else %}
+                        {% trans "引き出し未割り当て" %}
+                    {% endif %}
+                </td>
+                {% endif %}
+                <td>
+                    {% if obj.is_active %}
+                        <span class="badge badge-success">{% trans "有効" %}</span>
+                    {% else %}
+                        <span class="badge badge-danger">{% trans "無効" %}</span>
+                    {% endif %}
+                    {% if obj.current_quantity <= obj.minimum_quantity %}
+                        <span class="badge badge-warning">{% trans "低在庫" %}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{% url 'stock_service:update_stock_object_stock_service' obj.pk %}" class="btn btn-sm btn-info" title="{% trans "編集" %}"><i class="fas fa-edit"></i></a>
+                    <a href="{% url 'stock_service:delete_stock_object_stock_service' obj.pk %}" class="btn btn-sm btn-danger" title="{% trans "削除" %}"><i class="fas fa-trash-alt"></i></a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info" role="alert">
+    {% trans "登録されている在庫品目はありません。" %} <a href="{% url 'stock_service:add_stock_object_stock_service' %}">{% trans "新しい品目を追加しましょう" %}</a>.
+</div>
+{% endif %}
+{% endblock %}

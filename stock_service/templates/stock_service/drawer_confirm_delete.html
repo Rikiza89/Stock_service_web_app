@@ -1,0 +1,32 @@
+{% extends 'stock_service/app_base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "引き出しの削除" %}{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header bg-danger text-white">
+        <h4 class="mb-0"><i class="fas fa-exclamation-triangle mr-2"></i> {% trans "削除確認" %}</h4>
+    </div>
+    <div class="card-body">
+        <p>{% trans "本当にこの引き出しを削除しますか？" %}</p>
+        <div class="alert alert-warning" role="alert">
+            {% trans "この操作は元に戻せません。" %}
+            <br>
+            {% trans "削除対象" %}:
+            <ul>
+                <li><strong>{% trans "キャビネット名" %}:</strong> {{ drawer_obj.cabinet_name|default:"-" }}</li>
+                <li><strong>{% trans "X座標" %}:</strong> {{ drawer_obj.drawer_letter_x }}</li>
+                <li><strong>{% trans "Y座標" %}:</strong> {{ drawer_obj.drawer_number_y }}</li>
+                <li><strong>{% trans "説明" %}:</strong> {{ drawer_obj.description|default:"-" }}</li>
+            </ul>
+            <p class="mt-2"><strong>{% trans "注意" %}:</strong> {% trans "この引き出しに関連付けられている在庫品目がある場合、それらの品目の引き出し情報はクリアされます。" %}</p>
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger mt-3"><i class="fas fa-trash"></i> {% trans "削除" %}</button>
+            <a href="{% url 'stock_service:manage_drawers_stock_service' %}" class="btn btn-secondary mt-3 ml-2">{% trans "キャンセル" %}</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

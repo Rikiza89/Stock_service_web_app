@@ -1,0 +1,224 @@
+{% extends 'stock_service/app_base.html' %}
+
+{% block title %}プロフィール{% endblock %} {# Added a default title block here for consistency #}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-user-circle"></i> ユーザープロフィール
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5 class="text-primary mb-3">基本情報</h5>
+                        <table class="table table-borderless">
+                            <tr>
+                                <td class="font-weight-bold text-muted">ユーザー名:</td>
+                                <td>{{ user_info.username }}</td>
+                            </tr>
+                            {% if user_info.first_name or user_info.last_name %}
+                            <tr>
+                                <td class="font-weight-bold text-muted">氏名:</td>
+                                <td>{{ user_info.first_name }} {{ user_info.last_name }}</td>
+                            </tr>
+                            {% endif %}
+                            <tr>
+                                <td class="font-weight-bold text-muted">メールアドレス:</td>
+                                <td>{{ user_info.email|default:"未設定" }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold text-muted">登録日:</td>
+                                <td>{{ user_info.date_joined|date:"Y年m月d日 H:i" }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold text-muted">最終ログイン:</td>
+                                <td>
+                                    {% if user_info.last_login %}
+                                        {{ user_info.last_login|date:"Y年m月d日 H:i" }}
+                                    {% else %}
+                                        未記録
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div class="col-md-6">
+                        <h5 class="text-primary mb-3">アカウント状態</h5>
+                        <table class="table table-borderless">
+                            <tr>
+                                <td class="font-weight-bold text-muted">アカウント状態:</td>
+                                <td>
+                                    {% if user_info.is_active %}
+                                        <span class="badge badge-success">アクティブ</span>
+                                    {% else %}
+                                        <span class="badge badge-danger">非アクティブ</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold text-muted">スタッフ権限:</td>
+                                <td>
+                                    {% if user_info.is_staff %}
+                                        <span class="badge badge-info">スタッフ</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">一般ユーザー</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold text-muted">管理者権限:</td>
+                                <td>
+                                    {% if user_info.is_superuser %}
+                                        <span class="badge badge-warning">スーパーユーザー</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">一般ユーザー</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                {% if society_info %}
+                <hr class="my-4">
+                <div class="row">
+                    <div class="col-12">
+                        <h5 class="text-primary mb-3">会社情報</h5>
+                        <table class="table table-borderless">
+                            <tr>
+                                <td class="font-weight-bold text-muted">所属会社:</td>
+                                <td>{{ society_info.name }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold text-muted">引き出し管理権限:</td>
+                                <td>
+                                    {% if society_info.can_manage_drawers %}
+                                        <span class="badge badge-success">有効</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">無効</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold text-muted">会社管理者:</td>
+                                <td>
+                                    {% if society_info.is_society_admin %}
+                                        <span class="badge badge-primary">管理者</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">一般メンバー</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if user.groups.all %}
+                <hr class="my-4">
+                <div class="row">
+                    <div class="col-12">
+                        <h5 class="text-primary mb-3">グループ</h5>
+                        <div class="d-flex flex-wrap">
+                            {% for group in user.groups.all %}
+                                <span class="badge badge-info mr-2 mb-2">{{ group.name }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if user.user_permissions.all %}
+                <hr class="my-4">
+                <div class="row">
+                    <div class="col-12">
+                        <h5 class="text-primary mb-3">個別権限</h5>
+                        <div class="row">
+                            {% for permission in user.user_permissions.all %}
+                                <div class="col-md-6 mb-2">
+                                    <small class="text-muted">
+                                        <i class="fas fa-key"></i> {{ permission.name }}
+                                    </small>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <hr class="my-4">
+                <div class="row">
+                    <div class="col-12">
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'stock_service:app_home_stock_service' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> ダッシュボードに戻る
+                            </a>
+                            {% if user.is_superuser %}
+                            <a href="/rikizaadmin/" class="btn btn-outline-primary" target="_blank">
+                                <i class="fas fa-cogs"></i> 管理サイト
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mt-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-bar"></i> アクティビティサマリー
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <div class="border-right">
+                            <h4 class="text-primary">{{ user.date_joined|timesince }}</h4>
+                            <small class="text-muted">利用期間</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="border-right">
+                            <h4 class="text-success">
+                                {% if user.last_login %}
+                                    {{ user.last_login|timesince }}前
+                                {% else %}
+                                    未記録
+                                {% endif %}
+                            </h4>
+                            <small class="text-muted">最終ログイン</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <h4 class="text-info">{{ user.groups.count }}</h4>
+                        <small class="text-muted">所属グループ数</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.table td {
+    padding: 0.5rem 0.75rem;
+}
+.border-right {
+    border-right: 1px solid #dee2e6;
+}
+@media (max-width: 768px) {
+    .border-right {
+        border-right: none;
+        border-bottom: 1px solid #dee2e6;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+    }
+}
+</style>
+{% endblock %}

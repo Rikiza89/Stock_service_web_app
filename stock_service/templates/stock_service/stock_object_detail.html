@@ -1,0 +1,175 @@
+{% extends 'stock_service/app_base.html' %}
+{% load i18n %}
+
+{% block title %}{% blocktrans with object_name=stock_object.name %}「{{ object_name }}」の詳細{% endblocktrans %}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">{{ stock_object.name }} {% trans "詳細" %}</h4>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">{% trans "種類" %}</dt>
+                    <dd class="col-sm-9">{{ stock_object.kind.name|default:"-" }}</dd>
+
+                    <dt class="col-sm-3">{% trans "説明" %}</dt>
+                    <dd class="col-sm-9">{{ stock_object.description|default:"-" }}</dd>
+
+                    <dt class="col-sm-3">{% trans "現在の数量" %}</dt>
+                    <dd class="col-sm-9">{{ stock_object.current_quantity }} {{ stock_object.unit|default:"" }}</dd>
+
+                    <dt class="col-sm-3">{% trans "最低在庫数量" %}</dt>
+                    <dd class="col-sm-9">{{ stock_object.minimum_quantity }} {{ stock_object.unit|default:"" }}</dd>
+
+                    <dt class="col-sm-3">{% trans "単位" %}</dt>
+                    <dd class="col-sm-9">{{ stock_object.unit|default:"-" }}</dd>
+
+                    <dt class="col-sm-3">{% trans "一般的な保管場所" %}</dt>
+                    <dd class="col-sm-9">{{ stock_object.location_description|default:"-" }}</dd>
+
+                    <dt class="col-sm-3">{% trans "状態" %}</dt>
+                    <dd class="col-sm-9">
+                        {% if stock_object.is_active %}
+                            <span class="badge badge-success">{% trans "有効" %}</span>
+                        {% else %}
+                            <span class="badge badge-danger">{% trans "無効" %}</span>
+                        {% endif %}
+                        {% if stock_object.current_quantity <= stock_object.minimum_quantity %}
+                            <span class="badge badge-warning">{% trans "低在庫" %}</span>
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-3">{% trans "作成日" %}</dt>
+                    <dd class="col-sm-9">{{ stock_object.created_at|date:"Y年m月d日 H時i分" }}</dd>
+
+                    <dt class="col-sm-3">{% trans "最終更新日" %}</dt>
+                    <dd class="col-sm-9">{{ stock_object.updated_at|date:"Y年m月d日 H時i分" }}</dd>
+                </dl>
+            </div>
+            <div class="card-footer text-right">
+                <a href="{% url 'stock_service:update_stock_object_stock_service' stock_object.pk %}" class="btn btn-info mr-2">
+                    <i class="fas fa-edit"></i> {% trans "編集" %}
+                </a>
+                <a href="{% url 'stock_service:delete_stock_object_stock_service' stock_object.pk %}" class="btn btn-danger">
+                    <i class="fas fa-trash-alt"></i> {% trans "削除" %}
+                </a>
+            </div>
+        </div>
+
+        {% if society.can_manage_drawers %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0"><i class="fas fa-th-large mr-2"></i> {% trans "引き出し配置情報" %}</h4>
+            </div>
+            <div class="card-body">
+                {% if drawer_placements %}
+                <ul class="list-group list-group-flush">
+                    {% for placement in drawer_placements %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ placement.drawer.cabinet_name }}{{ placement.drawer.drawer_letter_x }}{{ placement.drawer.drawer_number_y }}</strong>
+                            <br>
+                            <small class="text-muted">{% trans "数量" %}: {{ placement.quantity }} {% trans "個" %}</small>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="alert alert-warning" role="alert">
+                    {% trans "この品目はまだ引き出しに割り当てられていません。" %}
+                </div>
+                {% endif %}
+                <div class="text-right mt-3">
+                    <a href="{% url 'stock_service:assign_stock_to_drawer_stock_service' %}" class="btn btn-sm btn-outline-info">
+                        <i class="fas fa-plus"></i> {% trans "引き出しに割り当てる" %}
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-md-4">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-history mr-2"></i> {% trans "最近の移動" %}</h5>
+            </div>
+            <div class="card-body">
+                {% if movements %}
+                <ul class="list-group list-group-flush">
+                    {% for movement in movements %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ movement.get_movement_type_display }}</strong> {% trans "数量" %}: {{ movement.quantity }}
+                            <br>
+                            <small class="text-muted">{% trans "日付" %}: {{ movement.timestamp|date:"Y年m月d日 H時i分" }}</small>
+                        </div>
+                        <span class="badge badge-{% if movement.movement_type == 'in' %}success{% else %}danger{% endif %}">{{ movement.get_movement_type_display }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="text-right mt-3">
+                    <a href="{% url 'stock_service:stock_movement_log_stock_service' %}" class="btn btn-sm btn-outline-secondary">{% trans "全ての移動を見る" %}</a>
+                </div>
+                {% else %}
+                <p class="text-muted">{% trans "この品目の移動履歴はありません。" %}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-users mr-2"></i> {% trans "最近の使用" %}</h5>
+            </div>
+            <div class="card-body">
+                {% if usages %}
+                <ul class="list-group list-group-flush">
+                    {% for usage in usages %}
+                    <li class="list-group-item">
+                        <strong>{{ usage.object_user.name }}</strong>: {{ usage.quantity_used }} {% trans "個" %}
+                        <br>
+                        <small class="text-muted">{% trans "期間" %}: {{ usage.start_date|date:"Y/m/d" }} - {{ usage.end_date|date:"Y/m/d"|default:"現在" }}</small>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="text-right mt-3">
+                    <a href="{% url 'stock_service:object_user_usage_log_stock_service' %}" class="btn btn-sm btn-outline-secondary">{% trans "全ての使用を見る" %}</a>
+                </div>
+                {% else %}
+                <p class="text-muted">{% trans "この品目の使用履歴はありません。" %}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-calendar-alt mr-2"></i> {% trans "補充スケジュール" %}</h5>
+            </div>
+            <div class="card-body">
+                {% if refills %}
+                <ul class="list-group list-group-flush">
+                    {% for refill in refills %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            {% trans "数量" %}: {{ refill.quantity_to_refill }} {% trans "個" %}
+                            <br>
+                            <small class="text-muted">{% trans "予定日" %}: {{ refill.scheduled_date|date:"Y/m/d" }}</small>
+                        </div>
+                        <span class="badge badge-{% if refill.is_completed %}success{% else %}info{% endif %}">{% if refill.is_completed %}{% trans "完了" %}{% else %}{% trans "予定" %}{% endif %}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="text-right mt-3">
+                    <a href="{% url 'stock_service:refill_scheduler_stock_service_general' %}" class="btn btn-sm btn-outline-secondary">{% trans "全てのスケジュールを見る" %}</a>
+                </div>
+                {% else %}
+                <p class="text-muted">{% trans "この品目の補充スケジュールはありません。" %}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

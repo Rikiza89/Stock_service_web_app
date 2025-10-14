@@ -1,0 +1,92 @@
+{# stock_service/templates/stock_service/refill_prediction.html #}
+{% extends 'stock_service/app_base.html' %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title }}</h2>
+
+    <p class="lead">{% translate "過去の消費データに基づき、在庫品目の補充時期を予測します。予測は過去90日間の平均消費量に基づいており、簡易的なものです。" %}</p>
+
+    {% if predictions %}
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>{% translate "品目名" %}</th>
+                    <th>{% translate "現在の数量" %}</th>
+                    <th>{% translate "最小数量" %}</th>
+                    <th>{% translate "単位" %}</th>
+                    <th>{% translate "種類" %}</th>
+                    <th>{% translate "保管場所" %}</th>
+                    <th>{% translate "90日間消費量" %}</th>
+                    <th>{% translate "日次平均消費量" %}</th>
+                    <th>{% translate "予測補充日 / ステータス" %}</th>
+                    <th>{% translate "アラート" %}</th> {# New column for alerts #}
+                    <th>{% translate "アクション" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for prediction in predictions %}
+                <tr class="{% if prediction.alert_message %}table-warning{% elif prediction.needs_refill %}table-danger{% endif %}">
+                    <td>
+                        <a href="{% url 'stock_service:stock_object_detail_stock_service' pk=prediction.stock_object.pk %}">
+                            {{ prediction.stock_object.name }}
+                        </a>
+                    </td>
+                    <td>
+                        <span class="{% if prediction.current_quantity <= prediction.minimum_quantity %}text-danger fw-bold{% endif %}">
+                            {{ prediction.current_quantity }}
+                        </span>
+                    </td>
+                    <td>{{ prediction.minimum_quantity }}</td>
+                    <td>{{ prediction.stock_object.unit }}</td>
+                    <td>{{ prediction.stock_object.kind.name }}</td>
+                    <td>
+                        {% if prediction.stock_object.location_description %}
+                            {{ prediction.stock_object.location_description }}
+                        {% elif prediction.stock_object.stockobjectdrawerplacement_set.all %}
+                            {% for placement in prediction.stock_object.stockobjectdrawerplacement_set.all %}
+                                {{ placement.drawer.cabinet_name }} - {{ placement.drawer.drawer_letter_x }}{{ placement.drawer.drawer_number_y }} ({{ placement.quantity }} {% translate "個" %})<br>
+                            {% endfor %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>{{ prediction.total_used_in_90_days }}</td>
+                    <td>{{ prediction.daily_usage }}</td>
+                    <td>
+                        {% if prediction.predicted_refill_date|date:"Y-m-d" %}
+                            {{ prediction.predicted_refill_date|date:"Y年m月d日" }}
+                        {% else %}
+                            {{ prediction.predicted_refill_date }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if prediction.alert_message %}
+                            <span class="badge bg-danger">{{ prediction.alert_message|safe }}</span> {# Use |safe if your alert message contains HTML like ** #}
+                        {% else %}
+                            <span class="badge bg-success">{% translate "問題なし" %}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'stock_service:refill_scheduler_stock_service' stock_object_pk=prediction.stock_object.pk %}" class="btn btn-sm btn-info">{% translate "補充注文" %}</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info" role="alert">
+        {% translate "表示する補充予測データがありません。" %}
+    </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{% url 'stock_service:stock_object_list_stock_service' %}" class="btn btn-secondary">{% translate "全在庫品目を見る" %}</a>
+    </div>
+</div>
+{% endblock %}

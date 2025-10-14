@@ -1,0 +1,90 @@
+{% extends 'stock_service/app_base.html' %}
+{% load i18n %}
+
+
+{% block title %}{% trans "利用ユーザー管理" %}{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h4 class="mb-0"><i class="fas fa-users mr-2"></i> {% trans "利用ユーザー管理" %}</h4>
+        <a href="{% url 'stock_service:user_create' %}" class="btn btn-light btn-sm">
+            <i class="fas fa-plus mr-1"></i> {% trans "新しいユーザーを追加" %}
+        </a>
+    </div>
+    <div class="card-body">
+        {# --- Display User/Admin Limits --- #}
+        {% if request.user.is_authenticated and request.user.society %}
+        <div class="alert alert-info small" role="alert">
+            <h6 class="alert-heading mb-1"><i class="fas fa-info-circle"></i> {% trans "現在のプラン制限" %}: <strong>{{ current_society_subscription_display }}</strong></h6>
+            <ul class="list-unstyled mb-0">
+                <li>
+                    {% trans "管理者数" %}:
+                    <strong>{{ admin_users_count }} /
+                    {% if max_admins == 'inf' %}{% trans "無制限" %}{% else %}{{ max_admins }}{% endif %}</strong>
+                </li>
+                <li>
+                    {% trans "合計ユーザー数" %}:
+                    <strong>{{ total_users_count }} /
+                    {% if max_users == 'inf' %}{% trans "無制限" %}{% else %}{{ max_users }}{% endif %}</strong>
+                </li>
+            </ul>
+        </div>
+        {% endif %}
+        {# --- END NEW --- #}
+
+        {% if users %}
+        <div class="table-responsive">
+            <table class="table table-hover table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "ユーザー名" %}</th>
+                        <th>{% trans "氏名" %}</th>
+                        <th>{% trans "メールアドレス" %}</th>
+                        <th>{% trans "社会管理者" %}</th>
+                        <th>{% trans "有効" %}</th>
+                        <th>{% trans "アクション" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user_obj in users %}
+                    <tr>
+                        <td>{{ user_obj.username }}</td>
+                        <td>{{ user_obj.get_full_name|default:"-" }}</td>
+                        <td>{{ user_obj.email|default:"-" }}</td>
+                        <td>
+                            {% if user_obj.is_society_admin %}
+                                <span class="badge badge-primary">{% trans "はい" %}</span>
+                            {% else %}
+                                <span class="badge badge-secondary">{% trans "いいえ" %}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user_obj.is_active %}
+                                <span class="badge badge-success">{% trans "はい" %}</span>
+                            {% else %}
+                                <span class="badge badge-danger">{% trans "いいえ" %}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'stock_service:user_update' user_obj.pk %}" class="btn btn-info btn-sm">
+                                <i class="fas fa-edit"></i> {% trans "編集" %}
+                            </a>
+                            <a href="{% url 'stock_service:user_delete' user_obj.pk %}" class="btn btn-danger btn-sm">
+                                <i class="fas fa-trash"></i> {% trans "削除" %}
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info" role="alert">
+            {% trans "この社会にはユーザーが登録されていません。" %}
+            <a href="{% url 'stock_service:user_create' %}" class="alert-link">{% trans "新しいユーザーを追加しましょう。" %}</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

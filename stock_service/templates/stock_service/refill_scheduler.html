@@ -1,0 +1,163 @@
+{% extends 'stock_service/app_base.html' %}
+{% load i18n %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>{% translate "補充スケジューラー" %}</h1>
+        <p class="lead">{% translate "在庫の補充計画を立てます。" %}</p>
+    </div>
+
+    {# Display Django Messages (success/error/info) #}
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>{% translate "新規補充スケジュールの作成" %}</h4>
+            {% if stock_object %}
+                <p class="mb-0">
+                    {% translate "品目" %}: <strong>{{ stock_object.name }}</strong> {% translate "の補充スケジュールを作成します。" %}
+                </p>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <form method="post" novalidate> {# novalidate prevents browser's default HTML5 validation #}
+                {% csrf_token %}
+
+                {# Global form errors (non-field errors) #}
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger mb-3">
+                        {% for error in form.non_field_errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                {# Render stock_object field conditionally #}
+                {% if stock_object %}
+                    {# If stock_object is pre-selected from URL, display its name and use hidden input #}
+                    <div class="mb-3">
+                        <label for="id_stock_object" class="form-label">{% translate "在庫品目" %}</label>
+                        <input type="text" class="form-control" value="{{ stock_object.name }}" disabled>
+                        {# Crucial: Send the stock_object's ID with the form for disabled fields #}
+                        <input type="hidden" name="{{ form.stock_object.name }}" value="{{ stock_object.pk }}">
+                    </div>
+                {% else %}
+                    {# Otherwise, render the select dropdown for stock_object #}
+                    <div class="mb-3">
+                        <label for="{{ form.stock_object.id_for_label }}" class="form-label">{{ form.stock_object.label }}</label>
+                        {{ form.stock_object }}
+                        {% if form.stock_object.errors %}
+                            {% for error in form.stock_object.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+                {# Render scheduled_date field #}
+                <div class="mb-3">
+                    <label for="{{ form.scheduled_date.id_for_label }}" class="form-label">{{ form.scheduled_date.label }}</label>
+                    {{ form.scheduled_date }}
+                    {% if form.scheduled_date.errors %}
+                        {% for error in form.scheduled_date.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+
+                {# Render quantity_to_refill field #}
+                <div class="mb-3">
+                    <label for="{{ form.quantity_to_refill.id_for_label }}" class="form-label">{{ form.quantity_to_refill.label }}</label>
+                    {{ form.quantity_to_refill }}
+                    {% if form.quantity_to_refill.errors %}
+                        {% for error in form.quantity_to_refill.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+
+                {# Render notes field #}
+                <div class="mb-3">
+                    <label for="{{ form.notes.id_for_label }}" class="form-label">{{ form.notes.label }}</label>
+                    {{ form.notes }}
+                    {% if form.notes.errors %}
+                        {% for error in form.notes.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+
+                <button type="submit" class="btn btn-primary mt-3">{% translate "スケジュール作成" %}</button>
+            </form>
+        </div>
+    </div>
+
+    {# Existing Schedules List #}
+    <div class="card">
+        <div class="card-header">
+            <h4>{% translate "既存の補充スケジュール" %}</h4>
+        </div>
+        <div class="card-body">
+            {% if existing_schedules %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>{% translate "在庫品目" %}</th>
+                                <th>{% translate "予定日" %}</th>
+                                <th>{% translate "数量" %}</th>
+                                <th>{% translate "備考" %}</th>
+                                <th>{% translate "完了済" %}</th>
+                                <th>{% translate "アクション" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for schedule in existing_schedules %}
+                            <tr class="{% if schedule.is_completed %}table-success{% endif %}">
+                                <td>{{ schedule.stock_object.name }}</td>
+                                <td>{{ schedule.scheduled_date|date:"Y年m月d日" }}</td>
+                                <td>{{ schedule.quantity_to_refill }} {{ schedule.stock_object.unit|default:"" }}</td>
+                                <td>{{ schedule.notes|default:"-" }}</td>
+                                <td>
+                                    {% if schedule.is_completed %}
+                                        <i class="fas fa-check-circle text-success"></i> {% translate "はい" %}
+                                        {% if schedule.completed_date %}
+                                            ({{ schedule.completed_date|date:"Y/m/d" }})
+                                        {% endif %}
+                                    {% else %}
+                                        <i class="fas fa-times-circle text-danger"></i> {% translate "いいえ" %}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if not schedule.is_completed %}
+                                    {# --- THIS IS THE CORRECTED PART --- #}
+                                    <form method="post" action="{% url 'stock_service:complete_refill_stock_service' pk=schedule.pk %}" style="display:inline;">
+                                        {% csrf_token %} {# CRUCIAL FOR POST REQUESTS #}
+                                        <button type="submit" class="btn btn-sm btn-success"
+                                                onclick="return confirm('{% translate 'この補充スケジュールを完了としてマークしますか？' %}');">
+                                            {% translate "完了" %}
+                                        </button>
+                                    </form>
+                                    {# --- END CORRECTED PART --- #}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">{% translate "登録された補充スケジュールはありません。" %}</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock content %}

@@ -1,0 +1,25 @@
+{% extends 'stock_service/app_base.html' %}
+{% load i18n %}
+
+{% block title %}{% blocktrans with name=stock_object.name %}「{{ name }}」を削除{% endblocktrans %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card border-danger shadow-sm">
+            <div class="card-header bg-danger text-white text-center">
+                <h4 class="mb-0"><i class="fas fa-exclamation-triangle mr-2"></i> {% trans "削除の確認" %}</h4>
+            </div>
+            <div class="card-body text-center">
+                <p class="lead">{% blocktrans with name=stock_object.name %}本当に在庫品目「<strong>{{ name }}</strong>」を削除してもよろしいですか？{% endblocktrans %}</p>
+                <p class="text-danger">{% trans "この操作は元に戻せません。" %}</p>
+                <form method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger mr-2">{% trans "削除する" %}</button>
+                    <a href="{% url 'stock_service:stock_object_detail_stock_service' stock_object.pk %}" class="btn btn-secondary">{% trans "キャンセル" %}</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

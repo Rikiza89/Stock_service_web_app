@@ -1,0 +1,101 @@
+{% extends 'stock_service/app_base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "料金プラン" %}{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <h2 class="text-center mb-4">{% trans "料金プラン" %}</h2>
+    <p class="text-center text-muted mb-5">
+        {% trans "お客様のビジネスニーズに合ったプランをお選びください。" %}
+    </p>
+
+    <div class="row row-cols-1 row-cols-md-3 mb-3 text-center">
+        {# Free Plan Card #}
+        <div class="col">
+            <div class="card mb-4 rounded-3 shadow-sm {% if current_plan == 'free' %}border-primary{% endif %}">
+                <div class="card-header py-3 {% if current_plan == 'free' %}bg-primary text-white{% endif %}">
+                    <h4 class="my-0 fw-normal">{% trans "無料" %}</h4>
+                </div>
+                <div class="card-body">
+                    {% if current_plan == 'free' %}
+                    <span class="badge bg-success text-white mb-3">{% trans "現在のプラン" %}</span>
+                    {% endif %}
+                    <h1 class="card-title pricing-card-title">¥0<small class="text-muted fw-light">/月</small></h1>
+                    <ul class="list-unstyled mt-3 mb-4 text-left">
+                        {% for feature in free_features %}
+                        <li><i class="fas fa-check-circle text-success me-2"></i> {{ feature }}</li>
+                        {% endfor %}
+                    </ul>
+                    {# Button logic: If current plan, show disabled button. Otherwise, show link to select. #}
+                    {% if current_plan == 'free' %}
+                        <button type="button" class="w-100 btn btn-lg btn-secondary" disabled>{% trans "現在のプラン" %}</button>
+                    {% else %}
+                        <a href="{% url 'stock_service:fake_payment_stock_service' %}?plan=free" class="w-100 btn btn-lg {% if current_plan == 'free' %}btn-secondary{% else %}btn-outline-primary{% endif %}">{% trans "選択" %}</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# Basic Plan Card #}
+        <div class="col">
+            <div class="card mb-4 rounded-3 shadow-sm {% if current_plan == 'basic' %}border-primary{% endif %}">
+                <div class="card-header py-3 {% if current_plan == 'basic' %}bg-primary text-white{% endif %}">
+                    <h4 class="my-0 fw-normal">{% trans "ベーシック" %}</h4>
+                </div>
+                <div class="card-body">
+                    {% if current_plan == 'basic' %}
+                    <span class="badge bg-success text-white mb-3">{% trans "現在のプラン" %}</span>
+                    {% endif %}
+                    <h1 class="card-title pricing-card-title">¥980<small class="text-muted fw-light">/月</small></h1>
+                    <ul class="list-unstyled mt-3 mb-4 text-left">
+                        {% for feature in basic_features %}
+                        <li><i class="fas fa-check-circle text-success me-2"></i> {{ feature }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% if current_plan == 'basic' %}
+                        <button type="button" class="w-100 btn btn-lg btn-secondary" disabled>{% trans "現在のプラン" %}</button>
+                    {% else %}
+                        <a href="{% url 'stock_service:fake_payment_stock_service' %}?plan=basic" class="w-100 btn btn-lg {% if current_plan == 'basic' %}btn-secondary{% else %}btn-primary{% endif %}">{% trans "選択" %}</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# Premium Plan Card #}
+        <div class="col">
+            <div class="card mb-4 rounded-3 shadow-sm {% if current_plan == 'premium' %}border-primary{% endif %}">
+                <div class="card-header py-3 {% if current_plan == 'premium' %}bg-primary text-white{% endif %}">
+                    <h4 class="my-0 fw-normal">{% trans "プレミアム" %}</h4>
+                </div>
+                <div class="card-body">
+                    {% if current_plan == 'premium' %}
+                    <span class="badge bg-success text-white mb-3">{% trans "現在のプラン" %}</span>
+                    {% endif %}
+                    <h1 class="card-title pricing-card-title">¥2980<small class="text-muted fw-light">/月</small></h1>
+                    <ul class="list-unstyled mt-3 mb-4 text-left">
+                        {% for feature in premium_features %}
+                        <li><i class="fas fa-check-circle text-success me-2"></i> {{ feature }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% if current_plan == 'premium' %}
+                        <button type="button" class="w-100 btn btn-lg btn-secondary" disabled>{% trans "現在のプラン" %}</button>
+                    {% else %}
+                        <a href="{% url 'stock_service:fake_payment_stock_service' %}?plan=premium" class="w-100 btn btn-lg {% if current_plan == 'premium' %}btn-secondary{% else %}btn-primary{% endif %}">{% trans "選択" %}</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr>
+
+    <div class="text-center mt-5">
+        <h4>{% trans "ご不明な点がありますか？" %}</h4>
+        <p class="text-muted">{% trans "お気軽にお問い合わせください。" %}</p>
+        <p>
+            <i class="fas fa-envelope me-2"></i> <a href="mailto:rikiza1989@gmail.com">メール</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

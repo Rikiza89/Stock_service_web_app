@@ -1,0 +1,30 @@
+{% extends 'stock_service/app_base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "在庫品目の種類の削除" %}{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header bg-danger text-white">
+        <h4 class="mb-0"><i class="fas fa-exclamation-triangle mr-2"></i> {% trans "削除確認" %}</h4>
+    </div>
+    <div class="card-body">
+        <p>{% trans "本当にこの在庫品目の種類を削除しますか？" %}</p>
+        <div class="alert alert-warning" role="alert">
+            {% trans "この操作は元に戻せません。" %}
+            <br>
+            {% trans "削除対象" %}:
+            <ul>
+                <li><strong>{% trans "種類名" %}:</strong> {{ kind_obj.name }}</li>
+                <li><strong>{% trans "説明" %}:</strong> {{ kind_obj.description|default:"-" }}</li>
+            </ul>
+            <p class="mt-2"><strong>{% trans "注意" %}:</strong> {% trans "この種類に関連付けられている全ての在庫品目も影響を受ける可能性があります。削除前に確認してください。" %}</p>
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger mt-3"><i class="fas fa-trash"></i> {% trans "削除" %}</button>
+            <a href="{% url 'stock_service:stock_object_kind_list_stock_service' %}" class="btn btn-secondary mt-3 ml-2">{% trans "キャンセル" %}</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

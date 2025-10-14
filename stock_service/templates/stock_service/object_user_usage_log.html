@@ -1,0 +1,49 @@
+{% extends 'stock_service/app_base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "オブジェクトユーザー使用ログ" %}{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{% url 'stock_service:add_stock_usage_stock_service' %}" class="btn btn-primary">
+        <i class="fas fa-plus-circle"></i> {% trans "利用履歴を記録" %}
+    </a>
+</div>
+
+{% if usages %}
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead class="thead-dark">
+            <tr>
+                <th>{% trans "品目名" %}</th>
+                <th>{% trans "利用ユーザー/部署" %}</th>
+                <th>{% trans "利用数量" %}</th>
+                <th>{% trans "利用開始日" %}</th>
+                <th>{% trans "利用終了日" %}</th>
+                <th>{% trans "記録者" %}</th>
+                <th>{% trans "記録日時" %}</th>
+                <th>{% trans "備考" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for usage in usages %}
+            <tr>
+                <td><a href="{% url 'stock_service:stock_object_detail_stock_service' usage.stock_object.pk %}">{{ usage.stock_object.name }}</a></td>
+                <td>{{ usage.object_user.name }}</td>
+                <td>{{ usage.quantity_used }}</td>
+                <td>{{ usage.start_date|date:"Y年m月d日" }}</td>
+                <td>{{ usage.end_date|date:"Y年m月d日"|default:_("継続中") }}</td>
+                <td>{{ usage.logged_by.username|default:_("N/A") }}</td>
+                <td>{{ usage.logged_at|date:"Y年m月d日 H時i分s秒" }}</td>
+                <td>{{ usage.notes|default:"-" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info" role="alert">
+    {% trans "オブジェクトユーザーによる在庫品目の利用履歴はありません。" %}
+</div>
+{% endif %}
+{% endblock %}
