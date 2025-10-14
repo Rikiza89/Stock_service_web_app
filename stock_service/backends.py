@@ -1,14 +1,8 @@
-# stock_service/backends.py
 from django.contrib.auth.backends import BaseBackend
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
-
-# あなたのUserモデルとSocietyモデルをインポート
-from .models import Society, User as CustomUser # あなたのUserモデルのエイリアス
-# settings.AUTH_USER_MODEL を取得する一般的な方法
-# UserModel = get_user_model()
-
+from .models import Society, User as CustomUser
 
 class SocietyAuthBackend(BaseBackend):
     """
@@ -16,7 +10,7 @@ class SocietyAuthBackend(BaseBackend):
     """
 
     def authenticate(self, request, username=None, password=None, society_name=None, **kwargs):
-        # ... (Noneチェック部分はそのまま)
+
         if username is None or password is None or society_name is None:
             return None # 必要な情報が不足している場合は認証を試みない
         
@@ -58,4 +52,5 @@ class SocietyAuthBackend(BaseBackend):
             # ここではCustomUserを使用しているため、CustomUser.objects.getを使う
             return CustomUser.objects.get(pk=user_id)
         except CustomUser.DoesNotExist:
+
             return None
