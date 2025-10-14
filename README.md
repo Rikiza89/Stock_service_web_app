@@ -98,11 +98,11 @@ python manage.py migrate
 python manage.py createsuperuser
 ```
 
-> 💡 **注:** スーパーユーザーは、初期セットアップや Django Admin サイトでの管理のために使用されます。
+> 💡 **注意:** スーパーユーザーは、初期セットアップや Django Admin サイトでの管理のために使用されます。
 
 ---
 
-## ⚙️ オプション設定: サンプルデータのロード (Optional Sample Data Loading)
+## ⚙️ オプション設定: サンプルデータのロード
 
 初期状態でテスト用のデータを作成する場合は、以下のコマンドを使用してサンプルデータを読み込むことができます。
 
