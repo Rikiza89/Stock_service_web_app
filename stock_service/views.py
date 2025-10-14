@@ -1,4 +1,3 @@
-# stock_service/views.py
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -24,7 +23,6 @@ from .models import (
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
-
 
 class UserManagementMixin(LoginRequiredMixin, UserPassesTestMixin):
     """
@@ -251,36 +249,6 @@ def custom_logout_stock_service(request):
     logout(request)
     messages.info(request, _('ログアウトしました。'))
     return redirect(reverse('stock_service:custom_login_stock_service'))
-
-# @login_required(login_url='stock_service:custom_login_stock_service')
-# def app_home_stock_service(request):
-#     """
-#     アプリケーションのホームビュー。
-#     ログインユーザーの社会に紐づく情報を表示するダッシュボード。
-#     """
-#     society = request.user.society
-#     total_stock_objects = StockObject.objects.filter(society=society).count()
-#     low_stock_objects = StockObject.objects.filter(
-#         society=society,
-#         current_quantity__lt=F('minimum_quantity')
-#     ).count()
-
-#     recent_movements = StockMovement.objects.filter(society=society).order_by('-timestamp')[:5]
-#     upcoming_refills = RefillSchedule.objects.filter(
-#         society=society,
-#         is_completed=False,
-#         scheduled_date__gte=date.today()
-#     ).order_by('scheduled_date')[:5]
-
-#     context = {
-#         'society': society,
-#         'total_stock_objects': total_stock_objects,
-#         'low_stock_objects': low_stock_objects,
-#         'recent_movements': recent_movements,
-#         'upcoming_refills': upcoming_refills,
-#         'title': _('ダッシュボード')
-#     }
-#     return render(request, 'stock_service/app_home.html', context)
 
 @login_required(login_url='stock_service:custom_login_stock_service')
 def app_home_stock_service(request):
@@ -793,9 +761,6 @@ def fake_payment_view(request):
     return redirect(reverse('stock_service:pricing_stock_service')) # Redirect will cause a fresh request and user object reload
     # Added refresh_from_db() to pricing_view directly to ensure it gets the latest data.
 
-
-
-
 @login_required(login_url='stock_service:custom_login_stock_service')
 def society_settings_stock_service(request):
     """
@@ -1173,4 +1138,5 @@ class ObjectUserDeleteView(ObjectUserManagementMixin, DeleteView):
 
     def form_valid(self, form):
         messages.success(self.request, _("オブジェクトユーザー '%(name)s' が正常に削除されました。") % {'name': self.object.name})
+
         return super().form_valid(form)
