@@ -4,7 +4,6 @@ from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.utils.translation import gettext_lazy as _
 import uuid
 
-# --- Subscription Plan Limits (NEW) ---
 SUBSCRIPTION_LIMITS = {
     'free': {
         'max_admins': 1,
@@ -20,7 +19,6 @@ SUBSCRIPTION_LIMITS = {
     },
 }
 
-# Define choices for subscription plans (ensure this is consistent with your current models.py)
 SUBSCRIPTION_CHOICES = [
     ('free', _('Free')),
     ('basic', _('Basic')),
@@ -47,7 +45,7 @@ class Society(models.Model):
     class Meta:
         verbose_name = _("社会")
         verbose_name_plural = _("社会")
-        unique_together = ('slug',) # Ensure slug is unique, or remove if not desired
+        unique_together = ('slug',)
 
     def __str__(self):
         return self.name
@@ -55,55 +53,12 @@ class Society(models.Model):
     def get_subscription_level_display(self):
         return dict(SUBSCRIPTION_CHOICES).get(self.subscription_level, self.subscription_level)
 
-    # --- NEW HELPER METHODS FOR LIMITS ---
     def get_max_admins(self):
         return SUBSCRIPTION_LIMITS.get(self.subscription_level, {})['max_admins']
 
     def get_max_users(self):
         return SUBSCRIPTION_LIMITS.get(self.subscription_level, {})['max_users']
 
-# class User(AbstractUser):
-#     """
-#     Custom user model for the stock management system.
-#     Each user belongs to a specific society.
-#     """
-#     society = models.ForeignKey(
-#         'Society',
-#         on_delete=models.CASCADE,
-#         related_name='users',
-#         verbose_name=_("Society")
-#     )
-#     is_society_admin = models.BooleanField(_("Is Society Admin"), default=False)
-
-#     class Meta:
-#         verbose_name = _("User")
-#         verbose_name_plural = _("Users")
-#         unique_together = ('username', 'society') # Ensure username is unique within a society
-
-#     def __str__(self):
-#         return f"{self.username} ({self.society.name})"
-
-#     # Add related_name to avoid clashes with auth.User
-#     # Make sure related_name for groups and user_permissions are UNIQUE
-#     groups = models.ManyToManyField(
-#         Group,
-#         verbose_name=_('groups'),
-#         blank=True,
-#         help_text=_(
-#             'The groups this user belongs to. A user will get all permissions '
-#             'granted to each of their groups.'
-#         ),
-#         related_name="stock_service_user_groups", # Changed for clarity and uniqueness
-#         related_query_name="stock_service_user_in_group", # Changed for clarity and uniqueness
-#     )
-#     user_permissions = models.ManyToManyField(
-#         Permission,
-#         verbose_name=_('user permissions'),
-#         blank=True,
-#         help_text=_('Specific permissions for this user.'),
-#         related_name="stock_service_user_permissions", # <-- CRITICAL: Made this unique!
-#         related_query_name="stock_service_user_has_perm", # <-- Also made this unique!
-#     )
 
 class User(AbstractUser):
     """
@@ -115,15 +70,15 @@ class User(AbstractUser):
         on_delete=models.CASCADE,
         related_name='users',
         verbose_name=_("Society"),
-        null=True,  # Allow NULL temporarily to handle existing users
-        blank=True  # Allow blank in forms
+        null=True,
+        blank=True
     )
     is_society_admin = models.BooleanField(_("Is Society Admin"), default=False)
 
     class Meta:
         verbose_name = _("User")
         verbose_name_plural = _("Users")
-        unique_together = ('username', 'society') # Ensure username is unique within a society
+        unique_together = ('username', 'society')
 
     def __str__(self):
         if self.society:
@@ -146,13 +101,10 @@ class User(AbstractUser):
         """
         Override save to run validation.
         """
-        # Only run full_clean for new users or when explicitly requested
         if not self.pk or kwargs.pop('validate', False):
             self.full_clean()
         super().save(*args, **kwargs)
 
-    # Add related_name to avoid clashes with auth.User
-    # Make sure related_name for groups and user_permissions are UNIQUE
     groups = models.ManyToManyField(
         Group,
         verbose_name=_('groups'),
@@ -161,16 +113,16 @@ class User(AbstractUser):
             'The groups this user belongs to. A user will get all permissions '
             'granted to each of their groups.'
         ),
-        related_name="stock_service_user_groups", # Changed for clarity and uniqueness
-        related_query_name="stock_service_user_in_group", # Changed for clarity and uniqueness
+        related_name="stock_service_user_groups", 
+        related_query_name="stock_service_user_in_group",
     )
     user_permissions = models.ManyToManyField(
         Permission,
         verbose_name=_('user permissions'),
         blank=True,
         help_text=_('Specific permissions for this user.'),
-        related_name="stock_service_user_permissions", # <-- CRITICAL: Made this unique!
-        related_query_name="stock_service_user_has_perm", # <-- Also made this unique!
+        related_name="stock_service_user_permissions",
+        related_query_name="stock_service_user_has_perm",
     )
 
 class StockObjectKind(models.Model):
@@ -225,7 +177,7 @@ class StockObject(models.Model):
     class Meta:
         verbose_name = _("Stock Object")
         verbose_name_plural = _("Stock Objects")
-        unique_together = ('society', 'name') # Ensures uniqueness of stock object name within a society
+        unique_together = ('society', 'name')
 
     def __str__(self):
         return f"{self.name} ({self.society.name})"
@@ -383,7 +335,7 @@ class StockUsage(models.Model):
     )
     quantity_used = models.PositiveIntegerField(_("Quantity Used"))
     start_date = models.DateField(_("Start Date"))
-    end_date = models.DateField(_("End Date"), null=True, blank=True) # Can be ongoing
+    end_date = models.DateField(_("End Date"), null=True, blank=True)
     notes = models.TextField(_("Notes"), blank=True)
     logged_by = models.ForeignKey(
         User,
@@ -436,3 +388,4 @@ class RefillSchedule(models.Model):
     def __str__(self):
         status = "Completed" if self.is_completed else "Pending"
         return f"Refill {self.quantity_to_refill} of {self.stock_object.name} on {self.scheduled_date} ({status})"
+
