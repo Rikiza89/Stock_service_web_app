@@ -11,7 +11,7 @@ from .views import (
 app_name = 'stock_service'
 
 urlpatterns = [
-    # --- NEW: User Management URLs ---
+
     path('users/', UserListView.as_view(), name='user_list'),
     path('users/create/', UserCreateView.as_view(), name='user_create'),
     path('users/<int:pk>/update/', UserUpdateView.as_view(), name='user_update'),
@@ -56,7 +56,8 @@ urlpatterns = [
 
     # 引き出し管理関連
     path('manage_drawers_stock_service/', views.manage_drawers_stock_service, name='manage_drawers_stock_service'),
-    # Drawer Management URLs
+    
+    #　ドロアー管理関連
     path('drawers/', views.manage_drawers_stock_service, name='manage_drawers_stock_service'),
     path('drawers/<uuid:pk>/update/', DrawerUpdateView.as_view(), name='drawer_update'), # UUIDFieldのため<uuid:pk>
     path('drawers/<uuid:pk>/delete/', DrawerDeleteView.as_view(), name='drawer_delete'), # UUIDFieldのため<uuid:pk>
@@ -71,10 +72,11 @@ urlpatterns = [
 
     path('profile/', views.user_profile_view, name='user_profile_stock_service'),
 
-    # NEW: ObjectUser Management URLs
+    # ObjectUser Management URLs
     path('objectusers/', ObjectUserListView.as_view(), name='objectuser_list'),
     path('objectusers/create/', ObjectUserCreateView.as_view(), name='objectuser_create'),
     path('objectusers/<uuid:pk>/update/', ObjectUserUpdateView.as_view(), name='objectuser_update'), # UUIDFieldのためpkをuuidで定義
     path('objectusers/<uuid:pk>/delete/', ObjectUserDeleteView.as_view(), name='objectuser_delete'), # UUIDFieldのためpkをuuidで定義
 
 ]
+
