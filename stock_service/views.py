@@ -1,3 +1,4 @@
+# stock_service/views.py
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -23,6 +24,7 @@ from .models import (
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
+
 
 class UserManagementMixin(LoginRequiredMixin, UserPassesTestMixin):
     """
@@ -160,6 +162,40 @@ def register_society_stock_service(request):
         form = SocietyRegistrationForm()
     return render(request, 'stock_service/register_society.html', {'form': form, 'title': _('新しい社会を登録')})
 
+# def custom_login_stock_service(request):
+#     """
+#     カスタムログインビュー。社会名、ユーザー名、パスワードを要求する。
+#     """
+#     if request.user.is_authenticated:
+#         return redirect(reverse('stock_service:app_home_stock_service'))
+
+#     if request.method == 'POST':
+#         form = CustomAuthenticationForm(request, data=request.POST)
+#         if form.is_valid():
+#             society_name = form.cleaned_data.get('society_name')
+#             username = form.cleaned_data.get('username')
+#             password = form.cleaned_data.get('password')
+
+#             # 新しいSocietyAuthBackendに社会名も渡して認証を試みる
+#             user = authenticate(request, username=username, password=password, society_name=society_name)
+
+#             if user is not None:
+#                 # ユーザーが認証されたら、ログイン処理
+#                 login(request, user)
+#                 messages.success(request, _('ようこそ、%(username)sさん！') % {'username': user.username})
+#                 return redirect(reverse('stock_service:app_home_stock_service'))
+#             else:
+#                 messages.error(request, _('無効なユーザー名、パスワード、または社会です。'))
+#         else:
+#             # フォームのバリデーションエラーメッセージを表示
+#             for field_name, errors in form.errors.items():
+#                 for error in errors:
+#                     label = form.fields[field_name].label if field_name in form.fields else field_name
+#                     messages.error(request, f"{label}: {error}")
+#     else:
+#         form = CustomAuthenticationForm()
+#     return render(request, 'stock_service/custom_login.html', {'form': form, 'title': _('ログイン')})
+
 def custom_login_stock_service(request):
     """
     カスタムログインビュー。社会名、ユーザー名、パスワードを要求する。
@@ -178,16 +214,11 @@ def custom_login_stock_service(request):
             user = authenticate(request, username=username, password=password, society_name=society_name)
 
             if user is not None:
-                # 【重要】: スーパーユーザーまたは is_staff フラグを持つユーザーを識別
-                is_admin_or_superuser = user.is_superuser or user.is_staff
-                
-                # 通常ユーザーのみ society の関連付けをチェックする
-                if not is_admin_or_superuser:
-                    # カスタムユーザーで society が設定されていない場合はエラーとする
-                    if not hasattr(user, 'society') or user.society is None:
-                        messages.error(request, _('あなたのアカウントは社会に関連付けられていません。管理者にお問い合わせください。'))
-                        return render(request, 'stock_service/custom_login.html', {'form': form, 'title': _('ログイン')})
-                
+                # ユーザーが認証された後、societyが存在するかチェック
+                if not hasattr(user, 'society') or user.society is None:
+                    messages.error(request, _('あなたのアカウントは社会に関連付けられていません。管理者にお問い合わせください。'))
+                    return render(request, 'stock_service/custom_login.html', {'form': form, 'title': _('ログイン')})
+
                 # ユーザーが認証されたら、ログイン処理
                 login(request, user)
                 messages.success(request, _('ようこそ、%(username)sさん！') % {'username': user.username})
@@ -249,6 +280,36 @@ def custom_logout_stock_service(request):
     logout(request)
     messages.info(request, _('ログアウトしました。'))
     return redirect(reverse('stock_service:custom_login_stock_service'))
+
+# @login_required(login_url='stock_service:custom_login_stock_service')
+# def app_home_stock_service(request):
+#     """
+#     アプリケーションのホームビュー。
+#     ログインユーザーの社会に紐づく情報を表示するダッシュボード。
+#     """
+#     society = request.user.society
+#     total_stock_objects = StockObject.objects.filter(society=society).count()
+#     low_stock_objects = StockObject.objects.filter(
+#         society=society,
+#         current_quantity__lt=F('minimum_quantity')
+#     ).count()
+
+#     recent_movements = StockMovement.objects.filter(society=society).order_by('-timestamp')[:5]
+#     upcoming_refills = RefillSchedule.objects.filter(
+#         society=society,
+#         is_completed=False,
+#         scheduled_date__gte=date.today()
+#     ).order_by('scheduled_date')[:5]
+
+#     context = {
+#         'society': society,
+#         'total_stock_objects': total_stock_objects,
+#         'low_stock_objects': low_stock_objects,
+#         'recent_movements': recent_movements,
+#         'upcoming_refills': upcoming_refills,
+#         'title': _('ダッシュボード')
+#     }
+#     return render(request, 'stock_service/app_home.html', context)
 
 @login_required(login_url='stock_service:custom_login_stock_service')
 def app_home_stock_service(request):
@@ -761,6 +822,9 @@ def fake_payment_view(request):
     return redirect(reverse('stock_service:pricing_stock_service')) # Redirect will cause a fresh request and user object reload
     # Added refresh_from_db() to pricing_view directly to ensure it gets the latest data.
 
+
+
+
 @login_required(login_url='stock_service:custom_login_stock_service')
 def society_settings_stock_service(request):
     """
@@ -1138,5 +1202,4 @@ class ObjectUserDeleteView(ObjectUserManagementMixin, DeleteView):
 
     def form_valid(self, form):
         messages.success(self.request, _("オブジェクトユーザー '%(name)s' が正常に削除されました。") % {'name': self.object.name})
-
         return super().form_valid(form)
