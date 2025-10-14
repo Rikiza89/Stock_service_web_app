@@ -3,11 +3,7 @@ from django.contrib.auth.backends import BaseBackend
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
-
-# あなたのUserモデルとSocietyモデルをインポート
 from .models import Society, User as CustomUser # あなたのUserモデルのエイリアス
-# settings.AUTH_USER_MODEL を取得する一般的な方法
-# UserModel = get_user_model()
 
 
 class SocietyAuthBackend(BaseBackend):
@@ -57,3 +53,4 @@ class SocietyAuthBackend(BaseBackend):
             return CustomUser.objects.get(pk=user_id)
         except CustomUser.DoesNotExist:
             return None
+
