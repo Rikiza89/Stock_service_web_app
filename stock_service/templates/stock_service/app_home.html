@@ -8,7 +8,7 @@
     <div class="col-md-12">
         <div class="alert alert-info" role="alert">
             {% trans "現在、" %}<strong>{{ society.name }}</strong> {% trans "社会としてログインしています。" %}
-            {% if user.is_society_admin %}<br>{% trans "あなたは社会管理者です。" %}{% endif %}
+            {% if is_society_admin %}<br>{% trans "あなたは社会管理者です。" %}{% endif %}
             <br>
             {% if society.subscription_level == 'free' %}
                 {% trans "現在のプラン：無料" %}. <a href="{% url 'stock_service:pricing_stock_service' %}">{% trans "プランをアップグレード" %}</a>

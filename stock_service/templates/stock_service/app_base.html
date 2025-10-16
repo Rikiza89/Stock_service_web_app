@@ -319,61 +319,61 @@
         <div id="sidebar-wrapper">
             <div class="sidebar-heading">Stock Service</div>
             <div class="list-group list-group-flush">
-                {% if user.is_authenticated %}
-                    <a href="{% url 'stock_service:app_home_stock_service' %}" class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'app_home_stock_service' %}active{% endif %}">
-                        <i class="fas fa-tachometer-alt"></i> ダッシュボード
-                    </a>
-                    <a href="{% url 'stock_service:stock_object_list_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_object_list' in request.resolver_match.url_name or 'stock_object_detail' in request.resolver_match.url_name or 'add_stock_object' in request.resolver_match.url_name or 'update_stock_object' in request.resolver_match.url_name %}active{% endif %}">
-                        <i class="fas fa-boxes"></i> 在庫品目
-                    </a>
-                    <a href="{% url 'stock_service:stock_out_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_out' in request.resolver_match.url_name %}active{% endif %}">
-                        <i class="fas fa-minus-circle"></i> 在庫出庫
-                    </a>
-                    <a href="{% url 'stock_service:stock_in_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_in' in request.resolver_match.url_name %}active{% endif %}">
-                        <i class="fas fa-plus-circle"></i> 在庫入庫
-                    </a>
-                    <a href="{% url 'stock_service:stock_movement_log_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_movement_log' in request.resolver_match.url_name %}active{% endif %}">
-                        <i class="fas fa-history"></i> 在庫移動履歴
-                    </a>
-                    {% if user.is_society_admin %} {# Assuming only society admins can manage ObjectUsers #}
-                    <a href="{% url 'stock_service:objectuser_list' %}" class="list-group-item list-group-item-action {% if 'objectuser' in request.resolver_match.url_name %}active{% endif %}">
-                        <i class="fas fa-users mr-1"></i> 利用ユーザー<br>（部署/機械）
-                    </a>
-                    {% endif %}
-                    <a href="{% url 'stock_service:object_user_usage_log_stock_service' %}" class="list-group-item list-group-item-action {% if 'object_user_usage_log' in request.resolver_match.url_name %}active{% endif %}">
-                        <i class="fas fa-users"></i> 利用履歴
-                    </a>
-                    <a href="{% url 'stock_service:refill_prediction_stock_service' %}" class="list-group-item list-group-item-action {% if 'refill_prediction' in request.resolver_match.url_name %}active{% endif %}">
-                        <i class="fas fa-chart-line"></i> 補充予測
-                    </a>
-                    <a href="{% url 'stock_service:refill_scheduler_stock_service_general' %}" class="list-group-item list-group-item-action {% if 'refill_scheduler' in request.resolver_match.url_name %}active{% endif %}">
-                        <i class="fas fa-calendar-alt"></i> 補充スケジューラー
-                    </a>
-                    <a href="{% url 'stock_service:stock_object_kind_list_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_object_kind_list' in request.resolver_match.url_name %}active{% endif %}">
-                        <i class="fas fa-tags"></i> 品目種類管理
-                    </a>
-                    {% if user.society.can_manage_drawers %}
-                    <a href="{% url 'stock_service:manage_drawers_stock_service' %}" class="list-group-item list-group-item-action {% if 'manage_drawers' in request.resolver_match.url_name or 'assign_stock_to_drawer' in request.resolver_match.url_name %}active{% endif %}">
-                        <i class="fas fa-th-large"></i> 引き出し管理
-                    </a>
-                    {% endif %}
-
-                    {% if user.is_society_admin %}
-                    <a href="{% url 'stock_service:society_settings_stock_service' %}" class="list-group-item list-group-item-action {% if 'society_settings' in request.resolver_match.url_name %}active{% endif %}">
-                        <i class="fas fa-cogs"></i> 会社設定
-                    </a>
-                    {% endif %}
-                    {% else %}
-                    <a href="{% url 'stock_service:custom_login_stock_service' %}" class="list-group-item list-group-item-action">
-                        <i class="fas fa-sign-in-alt"></i> ログイン
-                    </a>
-                    <a href="{% url 'stock_service:register_society_stock_service' %}" class="list-group-item list-group-item-action">
-                        <i class="fas fa-user-plus"></i> 会社登録
-                    </a>
-                    <a href="{% url 'stock_service:pricing_stock_service' %}" class="list-group-item list-group-item-action">
-                        <i class="fas fa-dollar-sign"></i> 料金プラン
-                    </a>
+            {% if user.is_authenticated %}
+                <a href="{% url 'stock_service:app_home_stock_service' %}" class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'app_home_stock_service' %}active{% endif %}">
+                    <i class="fas fa-tachometer-alt"></i> ダッシュボード
+                </a>
+                <a href="{% url 'stock_service:stock_object_list_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_object_list' in request.resolver_match.url_name or 'stock_object_detail' in request.resolver_match.url_name or 'add_stock_object' in request.resolver_match.url_name or 'update_stock_object' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-boxes"></i> 在庫品目
+                </a>
+                <a href="{% url 'stock_service:stock_out_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_out' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-minus-circle"></i> 在庫出庫
+                </a>
+                <a href="{% url 'stock_service:stock_in_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_in' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-plus-circle"></i> 在庫入庫
+                </a>
+                <a href="{% url 'stock_service:stock_movement_log_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_movement_log' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-history"></i> 在庫移動履歴
+                </a>
+                {% if is_society_admin %}  {# CHANGED FROM user.is_society_admin #}
+                <a href="{% url 'stock_service:objectuser_list' %}" class="list-group-item list-group-item-action {% if 'objectuser' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-users mr-1"></i> 利用ユーザー<br>（部署/機械）
+                </a>
                 {% endif %}
+                <a href="{% url 'stock_service:object_user_usage_log_stock_service' %}" class="list-group-item list-group-item-action {% if 'object_user_usage_log' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-users"></i> 利用履歴
+                </a>
+                <a href="{% url 'stock_service:refill_prediction_stock_service' %}" class="list-group-item list-group-item-action {% if 'refill_prediction' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-chart-line"></i> 補充予測
+                </a>
+                <a href="{% url 'stock_service:refill_scheduler_stock_service_general' %}" class="list-group-item list-group-item-action {% if 'refill_scheduler' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-calendar-alt"></i> 補充スケジューラー
+                </a>
+                <a href="{% url 'stock_service:stock_object_kind_list_stock_service' %}" class="list-group-item list-group-item-action {% if 'stock_object_kind_list' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-tags"></i> 品目種類管理
+                </a>
+                {% if user_society and user_society.can_manage_drawers %}  {# CHANGED FROM user.society.can_manage_drawers #}
+                <a href="{% url 'stock_service:manage_drawers_stock_service' %}" class="list-group-item list-group-item-action {% if 'manage_drawers' in request.resolver_match.url_name or 'assign_stock_to_drawer' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-th-large"></i> 引き出し管理
+                </a>
+                {% endif %}
+
+                {% if is_society_admin %}  {# CHANGED FROM user.is_society_admin #}
+                <a href="{% url 'stock_service:society_settings_stock_service' %}" class="list-group-item list-group-item-action {% if 'society_settings' in request.resolver_match.url_name %}active{% endif %}">
+                    <i class="fas fa-cogs"></i> 会社設定
+                </a>
+                {% endif %}
+            {% else %}
+                <a href="{% url 'stock_service:custom_login_stock_service' %}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-sign-in-alt"></i> ログイン
+                </a>
+                <a href="{% url 'stock_service:register_society_stock_service' %}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-user-plus"></i> 会社登録
+                </a>
+                <a href="{% url 'stock_service:pricing_stock_service' %}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-dollar-sign"></i> 料金プラン
+                </a>
+            {% endif %}
             </div>
         </div>
         <div id="page-content-wrapper">
