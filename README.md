@@ -59,10 +59,19 @@ pip install Django django-import-export
 
 カスタム認証が正しく機能するためには、Django の設定ファイルに以下の内容が含まれている必要があります。
 
-#### カスタムユーザーモデルの設定
+#### コンテキストプロセッサの追加
 
-```python
-AUTH_USER_MODEL = 'stock_service.User'
+``` python
+TEMPLATES = [
+    {
+        'OPTIONS': {
+            'context_processors': [
+                # ... 既存のプロセッサ
+                'stock_service.context_processors.society_context',
+            ],
+        },
+    },
+]
 ```
 
 #### カスタム認証バックエンドの設定
