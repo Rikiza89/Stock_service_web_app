@@ -717,36 +717,45 @@ def pricing_stock_service(request):
     ]
 
     current_plan_code = None
-    if request.user.is_authenticated:
-        society = get_user_society(request.user)
-        if society:
-            current_plan_code = society.subscription_level
-            
+    if request.user.is_authenticated and hasattr(request.user, 'society') and request.user.society:
+        request.user.refresh_from_db() # Ensure the user object and related society are fresh
+        current_plan_code = request.user.society.subscription_level if hasattr(request.user, 'society') else 'free'
     context = {
         'free_features': free_features,
         'basic_features': basic_features,
         'premium_features': premium_features,
-        'current_plan': current_plan_code,
-        'SUBSCRIPTION_CHOICES_DICT': dict(get_subscription_choices())
+
+        'current_plan': current_plan_code, # Pass the plan code
+        'SUBSCRIPTION_CHOICES_DICT': dict(get_subscription_choices()) # Pass for lookup in template if needed
     }
     return render(request, 'stock_service/pricing.html', context)
 
-
 @login_required(login_url='stock_service:custom_login_stock_service')
 def fake_payment_view(request):
-    selected_plan = request.GET.get('plan')
+    """
+    A dummy view to simulate a payment page and update society's subscription.
+    Handles both upgrades and downgrades.
+    """
+    selected_plan = request.GET.get('plan') # Get the plan from URL parameter
+
+    # Get valid choices directly from the model field for validation
     valid_subscription_choices = [choice[0] for choice in get_subscription_choices()]
 
     if selected_plan in valid_subscription_choices:
         try:
             society = get_user_society(request.user)
             if not society:
-                messages.error(request, _("User is not associated with a society."))
+                messages.error(request, _("ユーザーは社会に所属していません。"))
                 return redirect(reverse('stock_service:pricing_stock_service'))
 
+            society = get_user_society(request.user)
+
+            # Check if the selected plan is actually a change
             if society.subscription_level != selected_plan:
                 society.subscription_level = selected_plan
 
+                # --- Downgrade/Upgrade Feature Adjustment Logic ---
+                # This ensures features are automatically disabled if the new plan doesn't support them.
                 if selected_plan == 'free':
                     society.can_manage_drawers = False
                     society.shows_drawers_in_list = False
@@ -754,104 +763,112 @@ def fake_payment_view(request):
                     society.shows_drawers_in_list = False
 
                 society.save()
-                messages.success(request, _("Plan changed to %(plan)s!") % {'plan': society.get_subscription_level_display()})
+                messages.success(request, _("プランが %(plan)s に変更されました！") % {'plan': society.get_subscription_level_display()})
             else:
-                messages.info(request, _("Already using %(plan)s plan.") % {'plan': society.get_subscription_level_display()})
+                messages.info(request, _("すでに %(plan)s プランをご利用中です。") % {'plan': society.get_subscription_level_display()})
 
         except Exception as e:
-            messages.error(request, _("Error changing plan: %(error)s") % {'error': str(e)})
+            messages.error(request, _("プランの変更中にエラーが発生しました: %(error)s") % {'error': str(e)})
     else:
-        messages.error(request, _("Invalid plan selected."))
+        messages.error(request, _("無効なプランが選択されました。"))
 
-    return redirect(reverse('stock_service:pricing_stock_service'))
+    return redirect(reverse('stock_service:pricing_stock_service')) # Redirect will cause a fresh request and user object reload
+    # Added refresh_from_db() to pricing_view directly to ensure it gets the latest data.
 
 
 @login_required(login_url='stock_service:custom_login_stock_service')
 def society_settings_stock_service(request):
+    """
+    社会ごとの設定を管理するビュー。
+    特に引き出し管理オプション。
+    """
     society = get_user_society(request.user)
-    if not society:
-        messages.error(request, _("Society not found."))
-        return redirect('stock_service:app_home_stock_service')
-        
-    if not is_society_admin(request.user, society):
-        messages.error(request, _('You do not have permission to access this page.'))
+    if not request.user.is_society_admin:
+        messages.error(request, _('このページにアクセスする権限がありません。'))
         return redirect(reverse('stock_service:app_home_stock_service'))
 
     if request.method == 'POST':
         form = SocietySettingsForm(request.POST, instance=society)
         if form.is_valid():
             form.save()
-            messages.success(request, _('Society settings updated successfully.'))
+            messages.success(request, _('社会設定が正常に更新されました。'))
             return redirect(reverse('stock_service:society_settings_stock_service'))
         else:
-            messages.error(request, _('Failed to update society settings.'))
+            messages.error(request, _('社会設定の更新に失敗しました。フォームの入力内容を確認してください。'))
     else:
         form = SocietySettingsForm(instance=society)
 
     context = {
         'form': form,
-        'title': _('Society Settings'),
+        'title': _('社会設定'),
         'society': society,
-        'current_subscription_plan': society.get_subscription_level_display(),
-        'subscription_code': society.subscription_level,
+        'current_subscription_plan': society.get_subscription_level_display(), # Human-readable plan name
+        'subscription_code': society.subscription_level, # The code ('free', 'basic', 'premium')
     }
     return render(request, 'stock_service/society_settings.html', context)
 
-
 class DrawerManagementMixin(LoginRequiredMixin, UserPassesTestMixin):
+    """
+    Mixin to ensure user is logged in and is a society admin.
+    Also checks if drawer management is enabled for the society.
+    Ensures actions are within their society.
+    """
     login_url = reverse_lazy('stock_service:custom_login_stock_service')
 
     def test_func(self):
-        if not self.request.user.is_authenticated or not is_society_admin(self.request.user):
+        # 社会管理者であり、かつ引き出し管理が有効な社会に属している場合にアクセスを許可
+        if not self.request.user.is_authenticated or not self.request.user.is_society_admin:
             return False
 
-        society = get_user_society(self.request.user)
-        if not society:
-            messages.error(self.request, _("Society information not found."))
+        # Societyにcan_manage_drawersが設定されているか確認
+        if not hasattr(self.request.user, 'society') or not self.request.user.society:
+            messages.error(self.request, _("社会情報が見つかりません。"))
             return False
 
-        if not society.can_manage_drawers:
-            messages.warning(self.request, _('Drawer management is not enabled for this society.'))
+        if not self.request.user.society.can_manage_drawers:
+            messages.warning(self.request, _('この社会では引き出し管理機能が有効になっていません。'))
             return False
         return True
 
     def get_queryset(self):
-        society = get_user_society(self.request.user)
-        if society:
-            return Drawer.objects.filter(society=society).order_by('cabinet_name', 'drawer_letter_x', 'drawer_number_y')
-        return Drawer.objects.none()
+        # 現在の社会に属するDrawerのみをクエリ
+        if self.request.user.is_authenticated and self.request.user.society:
+            return Drawer.objects.filter(society=self.request.user.society).order_by('cabinet_name', 'drawer_letter_x', 'drawer_number_y')
+        return Drawer.objects.none() # 権限がない場合は空のクエリセットを返す
 
 
+# 既存の関数ベースビュー manage_drawers_stock_service は、リスト表示と新規作成フォームのみを扱います。
 @login_required(login_url='stock_service:custom_login_stock_service')
 def manage_drawers_stock_service(request):
-    society = get_user_society(request.user)
-    if not society:
-        messages.error(request, _("Society not found."))
-        return redirect('stock_service:app_home_stock_service')
-        
+    """
+    引き出しのリストを表示し、新しい引き出しを追加するビュー。
+    """
+    society = request.user.society
     if not society.can_manage_drawers:
-        messages.warning(request, _('Drawer management is not enabled for this society.'))
+        messages.warning(request, _('この社会では引き出し管理機能が有効になっていません。'))
         return redirect(reverse('stock_service:app_home_stock_service'))
 
     drawers = Drawer.objects.filter(society=society).order_by('cabinet_name', 'drawer_letter_x', 'drawer_number_y')
 
     if request.method == 'POST':
+        # フォームに society を渡す
         form = DrawerForm(request.POST, society=society)
         if form.is_valid():
             drawer = form.save(commit=False)
             drawer.society = society
             drawer.save()
-            messages.success(request, _('Drawer "%(drawer_name)s" added.') % {'drawer_name': drawer.__str__()})
+            messages.success(request, _('引き出し "%(drawer_name)s" が追加されました。') % {'drawer_name': drawer.__str__()})
             return redirect(reverse('stock_service:manage_drawers_stock_service'))
         else:
-            messages.error(request, _('Failed to add drawer.'))
+            messages.error(request, _('引き出しの追加に失敗しました。フォームの入力内容を確認してください。'))
     else:
+        # フォームに society を渡す
         form = DrawerForm(society=society)
 
     context = {
         'drawers': drawers,
         'form': form,
-        'title': _('Manage Drawers'),
+        'title': _('引き出しの管理'),
         'can_manage_drawers': society.can_manage_drawers,
     }
     return render(request, 'stock_service/manage_drawers.html', context)
@@ -860,236 +877,239 @@ def manage_drawers_stock_service(request):
 class DrawerUpdateView(DrawerManagementMixin, UpdateView):
     model = Drawer
     form_class = DrawerForm
-    template_name = 'stock_service/drawer_form.html'
-    context_object_name = 'drawer_obj'
+    template_name = 'stock_service/drawer_form.html' # 新しいフォームテンプレート
+    context_object_name = 'drawer_obj' # テンプレートでの変数名
     success_url = reverse_lazy('stock_service:manage_drawers_stock_service')
 
     def get_form_kwargs(self):
+        # フォームに society インスタンスを渡す
         kwargs = super().get_form_kwargs()
-        kwargs['society'] = get_user_society(self.request.user)
+        kwargs['society'] = self.request.user.society
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = _("Edit Drawer")
+        context['title'] = _("引き出しを編集")
         return context
 
     def form_valid(self, form):
-        messages.success(self.request, _("Drawer '%(drawer_name)s' updated successfully.") % {'drawer_name': form.instance.__str__()})
+        messages.success(self.request, _("引き出し '%(drawer_name)s' が正常に更新されました。") % {'drawer_name': form.instance.__str__()})
         return super().form_valid(form)
 
 
 class DrawerDeleteView(DrawerManagementMixin, DeleteView):
     model = Drawer
-    template_name = 'stock_service/drawer_confirm_delete.html'
-    context_object_name = 'drawer_obj'
+    template_name = 'stock_service/drawer_confirm_delete.html' # 新しい削除確認テンプレート
+    context_object_name = 'drawer_obj' # テンプレートでの変数名
     success_url = reverse_lazy('stock_service:manage_drawers_stock_service')
 
     def form_valid(self, form):
-        messages.success(self.request, _("Drawer '%(drawer_name)s' deleted successfully.") % {'drawer_name': self.object.__str__()})
+        messages.success(self.request, _("引き出し '%(drawer_name)s' が正常に削除されました。") % {'drawer_name': self.object.__str__()})
         return super().form_valid(form)
-
 
 @login_required(login_url='stock_service:custom_login_stock_service')
 def assign_stock_to_drawer_stock_service(request):
-    society = get_user_society(request.user)
-    if not society:
-        messages.error(request, _("Society not found."))
-        return redirect('stock_service:app_home_stock_service')
-        
+    """
+    在庫品目を引き出しに割り当てるビュー。
+    """
+    society = request.user.society
     if not society.can_manage_drawers:
-        messages.warning(request, _('Drawer management is not enabled for this society.'))
+        messages.warning(request, _('この社会では引き出し管理機能が有効になっていません。'))
         return redirect(reverse('stock_service:app_home_stock_service'))
 
     if request.method == 'POST':
         form = StockObjectDrawerPlacementForm(request.POST, society=society)
         if form.is_valid():
             placement = form.save(commit=False)
-            placement.save()
-            messages.success(request, _('%(stock_object)s assigned to %(drawer)s.') % {'stock_object': placement.stock_object.name, 'drawer': placement.drawer.__str__()})
+            placement.save() # societyはモデルに直接紐づいていないが、フォームでフィルタリングされている
+            messages.success(request, _('%(stock_object)s が %(drawer)s に割り当てられました。') % {'stock_object': placement.stock_object.name, 'drawer': placement.drawer.__str__()})
             return redirect(reverse('stock_service:stock_object_detail_stock_service', args=[placement.stock_object.pk]))
         else:
-            messages.error(request, _('Failed to assign stock to drawer.'))
+            messages.error(request, _('在庫品目の引き出しへの割り当てに失敗しました。フォームの入力内容を確認してください。'))
     else:
         form = StockObjectDrawerPlacementForm(society=society)
 
     context = {
         'form': form,
-        'title': _('Assign Stock to Drawer'),
+        'title': _('引き出しに在庫を割り当てる'),
     }
     return render(request, 'stock_service/assign_stock_to_drawer.html', context)
 
-
 class StockObjectKindManagementMixin(LoginRequiredMixin, UserPassesTestMixin):
+    """
+    Mixin to ensure user is logged in and is a society admin.
+    Ensures actions are within their society.
+    """
     login_url = reverse_lazy('stock_service:custom_login_stock_service')
 
     def test_func(self):
-        return self.request.user.is_authenticated and is_society_admin(self.request.user)
+        # 社会管理者のみがアクセスできる
+        return self.request.user.is_authenticated and self.request.user.is_society_admin
 
     def get_queryset(self):
-        society = get_user_society(self.request.user)
-        if society:
-            return StockObjectKind.objects.filter(society=society).order_by('name')
-        return StockObjectKind.objects.none()
-
+        # 現在の社会に属するStockObjectKindのみをクエリ
+        if self.request.user.is_authenticated and self.request.user.is_society_admin:
+            return StockObjectKind.objects.filter(society=self.request.user.society).order_by('name')
+        return StockObjectKind.objects.none() # 権限がない場合は空のクエリセットを返す
 
 @login_required(login_url='stock_service:custom_login_stock_service')
 def stock_object_kind_list_stock_service(request):
-    society = get_user_society(request.user)
-    if not society:
-        messages.error(request, _("Society not found."))
-        return redirect('stock_service:app_home_stock_service')
-        
+    """
+    在庫品目の種類のリストを表示・管理するビュー。
+    新しい種類の追加もここで行う。
+    """
+    society = request.user.society
     kinds = StockObjectKind.objects.filter(society=society).order_by('name')
 
     if request.method == 'POST':
+        # フォームにsocietyを渡す
         form = StockObjectKindForm(request.POST, society=society)
         if form.is_valid():
             kind = form.save(commit=False)
             kind.society = society
             kind.save()
-            messages.success(request, _('Stock object kind "%(name)s" added.') % {'name': kind.name})
+            messages.success(request, _('在庫品目の種類 "%(name)s" が追加されました。') % {'name': kind.name})
             return redirect(reverse('stock_service:stock_object_kind_list_stock_service'))
         else:
-            messages.error(request, _('Failed to add stock object kind.'))
+            messages.error(request, _('在庫品目の種類の追加に失敗しました。フォームの入力内容を確認してください。'))
     else:
+        # フォームにsocietyを渡す
         form = StockObjectKindForm(society=society)
 
     context = {
         'kinds': kinds,
         'form': form,
-        'title': _('Manage Stock Object Kinds'),
+        'title': _('在庫品目の種類の管理'),
     }
     return render(request, 'stock_service/stock_object_kind_list.html', context)
-
 
 class StockObjectKindUpdateView(StockObjectKindManagementMixin, UpdateView):
     model = StockObjectKind
     form_class = StockObjectKindForm
-    template_name = 'stock_service/stock_object_kind_form.html'
-    context_object_name = 'kind_obj'
+    template_name = 'stock_service/stock_object_kind_form.html' # 新しいフォームテンプレート
+    context_object_name = 'kind_obj' # テンプレートでの変数名
     success_url = reverse_lazy('stock_service:stock_object_kind_list_stock_service')
 
     def get_form_kwargs(self):
+        # フォームに society インスタンスを渡す
         kwargs = super().get_form_kwargs()
-        kwargs['society'] = get_user_society(self.request.user)
+        kwargs['society'] = self.request.user.society
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = _("Edit Stock Object Kind")
+        context['title'] = _("在庫品目の種類を編集")
         return context
 
     def form_valid(self, form):
-        messages.success(self.request, _("Stock object kind '%(name)s' updated successfully.") % {'name': form.instance.name})
+        messages.success(self.request, _("在庫品目の種類 '%(name)s' が正常に更新されました。") % {'name': form.instance.name})
         return super().form_valid(form)
 
 
 class StockObjectKindDeleteView(StockObjectKindManagementMixin, DeleteView):
     model = StockObjectKind
-    template_name = 'stock_service/stock_object_kind_confirm_delete.html'
-    context_object_name = 'kind_obj'
+    template_name = 'stock_service/stock_object_kind_confirm_delete.html' # 新しい削除確認テンプレート
+    context_object_name = 'kind_obj' # テンプレートでの変数名
     success_url = reverse_lazy('stock_service:stock_object_kind_list_stock_service')
 
     def form_valid(self, form):
-        messages.success(self.request, _("Stock object kind '%(name)s' deleted successfully.") % {'name': self.object.name})
+        messages.success(self.request, _("在庫品目の種類 '%(name)s' が正常に削除されました。") % {'name': self.object.name})
         return super().form_valid(form)
-
 
 @login_required(login_url='stock_service:custom_login_stock_service')
 def add_stock_object_stock_service(request):
-    society = get_user_society(request.user)
-    if not society:
-        messages.error(request, _("Society not found."))
-        return redirect('stock_service:app_home_stock_service')
-        
+    """
+    新しい在庫品目を追加するビュー。
+    """
+    society = request.user.society
     if request.method == 'POST':
         form = StockObjectForm(request.POST, society=society)
         if form.is_valid():
             stock_object = form.save(commit=False)
             stock_object.society = society
             stock_object.save()
-            messages.success(request, _('New stock object "%(name)s" added.') % {'name': stock_object.name})
+            messages.success(request, _('新しい在庫品目 "%(name)s" が追加されました。') % {'name': stock_object.name})
             return redirect(reverse('stock_service:stock_object_list_stock_service'))
         else:
-            messages.error(request, _('Failed to add stock object.'))
+            messages.error(request, _('在庫品目の追加に失敗しました。フォームの入力内容を確認してください。'))
     else:
         form = StockObjectForm(society=society)
 
     context = {
         'form': form,
-        'title': _('Add New Stock Object'),
+        'title': _('新しい在庫品目を追加'),
     }
     return render(request, 'stock_service/add_stock_object.html', context)
 
-
 @login_required(login_url='stock_service:custom_login_stock_service')
 def update_stock_object_stock_service(request, pk):
-    society = get_user_society(request.user)
-    if not society:
-        messages.error(request, _("Society not found."))
-        return redirect('stock_service:app_home_stock_service')
-        
+    """
+    既存の在庫品目を更新するビュー。
+    """
+    society = request.user.society
     stock_object = get_object_or_404(StockObject, pk=pk, society=society)
 
     if request.method == 'POST':
         form = StockObjectForm(request.POST, instance=stock_object, society=society)
         if form.is_valid():
             form.save()
-            messages.success(request, _('Stock object "%(name)s" updated.') % {'name': stock_object.name})
+            messages.success(request, _('在庫品目 "%(name)s" が更新されました。') % {'name': stock_object.name})
             return redirect(reverse('stock_service:stock_object_detail_stock_service', args=[pk]))
         else:
-            messages.error(request, _('Failed to update stock object.'))
+            messages.error(request, _('在庫品目の更新に失敗しました。フォームの入力内容を確認してください。'))
     else:
         form = StockObjectForm(instance=stock_object, society=society)
 
     context = {
         'form': form,
         'stock_object': stock_object,
-        'title': _('Update %(name)s') % {'name': stock_object.name},
+        'title': _('%(name)s を更新') % {'name': stock_object.name},
     }
     return render(request, 'stock_service/update_stock_object.html', context)
 
-
 @login_required(login_url='stock_service:custom_login_stock_service')
 def delete_stock_object_stock_service(request, pk):
-    society = get_user_society(request.user)
-    if not society:
-        messages.error(request, _("Society not found."))
-        return redirect('stock_service:app_home_stock_service')
-        
+    """
+    在庫品目を削除するビュー。
+    """
+    society = request.user.society
     stock_object = get_object_or_404(StockObject, pk=pk, society=society)
 
     if request.method == 'POST':
         stock_object.delete()
-        messages.success(request, _('Stock object "%(name)s" deleted.') % {'name': stock_object.name})
+        messages.success(request, _('在庫品目 "%(name)s" が削除されました。') % {'name': stock_object.name})
         return redirect(reverse('stock_service:stock_object_list_stock_service'))
 
     context = {
         'stock_object': stock_object,
-        'title': _('Delete %(name)s') % {'name': stock_object.name},
+        'title': _('%(name)s を削除') % {'name': stock_object.name},
     }
     return render(request, 'stock_service/confirm_delete.html', context)
 
 
+
 class ObjectUserManagementMixin(LoginRequiredMixin, UserPassesTestMixin):
+    """
+    Mixin to ensure user is logged in and is a society admin.
+    Also ensures actions are within their society.
+    """
     login_url = reverse_lazy('stock_service:custom_login_stock_service')
 
     def test_func(self):
-        return self.request.user.is_authenticated and is_society_admin(self.request.user)
+        # 社会管理者のみがアクセスできる
+        return self.request.user.is_authenticated and self.request.user.is_society_admin
 
     def get_queryset(self):
-        society = get_user_society(self.request.user)
-        if society:
-            return ObjectUser.objects.filter(society=society).order_by('name')
-        return ObjectUser.objects.none()
-
+        # 現在の社会に属するObjectUserのみをクエリ
+        if self.request.user.is_authenticated and self.request.user.is_society_admin:
+            return ObjectUser.objects.filter(society=self.request.user.society).order_by('name')
+        return ObjectUser.objects.none() # 権限がない場合は空のクエリセットを返す
 
 class ObjectUserListView(ObjectUserManagementMixin, ListView):
     model = ObjectUser
     template_name = 'stock_service/objectuser_list.html'
     context_object_name = 'object_users'
-    paginate_by = 20
+    paginate_by = 20 # 任意でページネーションを設定
 
 
 class ObjectUserCreateView(ObjectUserManagementMixin, CreateView):
@@ -1099,13 +1119,15 @@ class ObjectUserCreateView(ObjectUserManagementMixin, CreateView):
     success_url = reverse_lazy('stock_service:objectuser_list')
 
     def get_form_kwargs(self):
+        # フォームに society インスタンスを渡す
         kwargs = super().get_form_kwargs()
-        kwargs['society'] = get_user_society(self.request.user)
+        kwargs['society'] = self.request.user.society # <-- This line is crucial and correct
         return kwargs
 
     def form_valid(self, form):
-        form.instance.society = get_user_society(self.request.user)
-        messages.success(self.request, _("Object user '%(name)s' created successfully.") % {'name': form.instance.name})
+        # form.instance の society フィールドを自動的に設定
+        form.instance.society = self.request.user.society
+        messages.success(self.request, _("オブジェクトユーザー '%(name)s' が正常に作成されました。") % {'name': form.instance.name})
         return super().form_valid(form)
 
 
@@ -1114,11 +1136,12 @@ class ObjectUserUpdateView(ObjectUserManagementMixin, UpdateView):
     form_class = ObjectUserForm
     template_name = 'stock_service/objectuser_form.html'
     success_url = reverse_lazy('stock_service:objectuser_list')
-    context_object_name = 'objectuser_obj'
+    context_object_name = 'objectuser_obj' # テンプレートでの変数名
 
     def get_form_kwargs(self):
+        # フォームに society インスタンスを渡す (更新時も必要)
         kwargs = super().get_form_kwargs()
-        kwargs['society'] = get_user_society(self.request.user)
+        kwargs['society'] = self.request.user.society # <-- This line is crucial and correct
         return kwargs
 
 
@@ -1129,5 +1152,5 @@ class ObjectUserDeleteView(ObjectUserManagementMixin, DeleteView):
     context_object_name = 'objectuser_obj'
 
     def form_valid(self, form):
-        messages.success(self.request, _("Object user '%(name)s' deleted successfully.") % {'name': self.object.name})
+        messages.success(self.request, _("オブジェクトユーザー '%(name)s' が正常に削除されました。") % {'name': self.object.name})
         return super().form_valid(form)

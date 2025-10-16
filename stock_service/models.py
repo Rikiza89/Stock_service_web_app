@@ -1,21 +1,21 @@
 # stock_service/models.py
 from django.db import models
-from django.contrib.auth.models import AbstractUser, Group, Permission
+from django.contrib.auth.models import User
 from django.utils.translation import gettext_lazy as _
 import uuid
 
 SUBSCRIPTION_LIMITS = {
     'free': {
         'max_admins': 1,
-        'max_users': 2,  # Total users including admins
+        'max_users': 2,
     },
     'basic': {
         'max_admins': 2,
-        'max_users': 10, # Total users including admins
+        'max_users': 10,
     },
     'premium': {
-        'max_admins': float('inf'), # Use float('inf') for indefinite
-        'max_users': float('inf'),  # Use float('inf') for indefinite
+        'max_admins': float('inf'),
+        'max_users': float('inf'),
     },
 }
 
@@ -29,7 +29,7 @@ SUBSCRIPTION_CHOICES = [
 class Society(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(_("Society Name"), max_length=255, unique=True)
-    slug = models.SlugField(_("Society Slug"), unique=True, help_text=_("A unique identifier for the society in URLs."))
+    slug = models.SlugField(_("Society Slug"), unique=True)
     is_active = models.BooleanField(_("Is Active"), default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -45,13 +45,9 @@ class Society(models.Model):
     class Meta:
         verbose_name = _("社会")
         verbose_name_plural = _("社会")
-        unique_together = ('slug',)
 
     def __str__(self):
         return self.name
-
-    def get_subscription_level_display(self):
-        return dict(SUBSCRIPTION_CHOICES).get(self.subscription_level, self.subscription_level)
 
     def get_max_admins(self):
         return SUBSCRIPTION_LIMITS.get(self.subscription_level, {})['max_admins']
@@ -60,75 +56,25 @@ class Society(models.Model):
         return SUBSCRIPTION_LIMITS.get(self.subscription_level, {})['max_users']
 
 
-class User(AbstractUser):
+class SocietyUser(models.Model):
     """
-    Custom user model for the stock management system.
-    Each user belongs to a specific society.
+    Through model for User-Society many-to-many relationship.
+    Tracks if a user is an admin for a specific society.
     """
-    society = models.ForeignKey(
-        'Society',
-        on_delete=models.CASCADE,
-        related_name='users',
-        verbose_name=_("Society"),
-        null=True,
-        blank=True
-    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='society_memberships')
+    society = models.ForeignKey(Society, on_delete=models.CASCADE, related_name='user_memberships')
     is_society_admin = models.BooleanField(_("Is Society Admin"), default=False)
-
+    
     class Meta:
-        verbose_name = _("User")
-        verbose_name_plural = _("Users")
-        unique_together = ('username', 'society')
-
+        unique_together = ('user', 'society')
+        verbose_name = _("Society User")
+        verbose_name_plural = _("Society Users")
+    
     def __str__(self):
-        if self.society:
-            return f"{self.username} ({self.society.name})"
-        else:
-            return f"{self.username} (No Society)"
+        return f"{self.user.username} - {self.society.name} ({'Admin' if self.is_society_admin else 'User'})"
 
-    def clean(self):
-        """
-        Custom validation to ensure users have required fields.
-        """
-        from django.core.exceptions import ValidationError
-        super().clean()
-
-        # Allow superusers to exist without a Society
-        if self.is_active and not self.is_superuser and not self.society:
-            raise ValidationError(_("アクティブなユーザーは社会に関連付けられている必要があります。"))
-
-    def save(self, *args, **kwargs):
-        """
-        Override save to run validation.
-        """
-        if not self.pk or kwargs.pop('validate', False):
-            self.full_clean()
-        super().save(*args, **kwargs)
-
-    groups = models.ManyToManyField(
-        Group,
-        verbose_name=_('groups'),
-        blank=True,
-        help_text=_(
-            'The groups this user belongs to. A user will get all permissions '
-            'granted to each of their groups.'
-        ),
-        related_name="stock_service_user_groups", 
-        related_query_name="stock_service_user_in_group",
-    )
-    user_permissions = models.ManyToManyField(
-        Permission,
-        verbose_name=_('user permissions'),
-        blank=True,
-        help_text=_('Specific permissions for this user.'),
-        related_name="stock_service_user_permissions",
-        related_query_name="stock_service_user_has_perm",
-    )
 
 class StockObjectKind(models.Model):
-    """
-    Defines the kind of stock object a society wants to manage (e.g., 'Electronics', 'Tools').
-    """
     society = models.ForeignKey(
         Society,
         on_delete=models.CASCADE,
@@ -146,10 +92,8 @@ class StockObjectKind(models.Model):
     def __str__(self):
         return f"{self.name} ({self.society.name})"
 
+
 class StockObject(models.Model):
-    """
-    Represents a specific stock item managed by a society.
-    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     society = models.ForeignKey(
         Society,
@@ -167,9 +111,9 @@ class StockObject(models.Model):
     name = models.CharField(_("Stock Object Name"), max_length=255)
     description = models.TextField(_("Description"), blank=True)
     current_quantity = models.PositiveIntegerField(_("Current Quantity"), default=0)
-    minimum_quantity = models.PositiveIntegerField(_("Minimum Quantity"), default=0, help_text=_("Threshold for refilling."))
-    unit = models.CharField(_("Unit"), max_length=50, blank=True, help_text=_("e.g., 'pcs', 'kg', 'meters'"))
-    location_description = models.CharField(_("Location Description"), max_length=255, blank=True, help_text=_("General location if not using drawers."))
+    minimum_quantity = models.PositiveIntegerField(_("Minimum Quantity"), default=0)
+    unit = models.CharField(_("Unit"), max_length=50, blank=True)
+    location_description = models.CharField(_("Location Description"), max_length=255, blank=True)
     is_active = models.BooleanField(_("Is Active"), default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -182,10 +126,8 @@ class StockObject(models.Model):
     def __str__(self):
         return f"{self.name} ({self.society.name})"
 
+
 class Drawer(models.Model):
-    """
-    Represents a numbered drawer within a parts cabinet for a society.
-    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     society = models.ForeignKey(
         Society,
@@ -193,7 +135,7 @@ class Drawer(models.Model):
         related_name='drawers',
         verbose_name=_("Society")
     )
-    cabinet_name = models.CharField(_("Cabinet Name"), max_length=100, blank=True, help_text=_("e.g., 'Cabinet A'"))
+    cabinet_name = models.CharField(_("Cabinet Name"), max_length=100, blank=True)
     drawer_letter_x = models.CharField(_("Drawer Letter (X-axis)"), max_length=1)
     drawer_number_y = models.PositiveIntegerField(_("Drawer Number (Y-axis)"))
     description = models.TextField(_("Description"), blank=True)
@@ -207,10 +149,8 @@ class Drawer(models.Model):
     def __str__(self):
         return f"{self.cabinet_name} - {self.drawer_letter_x}{self.drawer_number_y} ({self.society.name})"
 
+
 class StockObjectDrawerPlacement(models.Model):
-    """
-    Links a StockObject to a Drawer and specifies the quantity in that drawer.
-    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     stock_object = models.ForeignKey(
         StockObject,
@@ -236,9 +176,6 @@ class StockObjectDrawerPlacement(models.Model):
 
 
 class StockMovement(models.Model):
-    """
-    Logs the in and out movements of stock objects.
-    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     society = models.ForeignKey(
         Society,
@@ -273,8 +210,7 @@ class StockMovement(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        verbose_name=_("Drawer Involved"),
-        help_text=_("Drawer from which stock was pulled out or put in.")
+        verbose_name=_("Drawer Involved")
     )
 
     class Meta:
@@ -283,13 +219,10 @@ class StockMovement(models.Model):
         ordering = ['-timestamp']
 
     def __str__(self):
-        return f"{self.movement_type.upper()} {self.quantity} of {self.stock_object.name} by {self.moved_by or 'N/A'} at {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
+        return f"{self.movement_type.upper()} {self.quantity} of {self.stock_object.name}"
+
 
 class ObjectUser(models.Model):
-    """
-    Represents a user (e.g., an employee, a department) who uses stock objects.
-    This is distinct from the system User who logs in.
-    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     society = models.ForeignKey(
         Society,
@@ -309,11 +242,8 @@ class ObjectUser(models.Model):
     def __str__(self):
         return f"{self.name} ({self.society.name})"
 
+
 class StockUsage(models.Model):
-    """
-    Logs which ObjectUser is using how many StockObjects in what period.
-    Used for predicting refill timing.
-    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     society = models.ForeignKey(
         Society,
@@ -353,12 +283,10 @@ class StockUsage(models.Model):
         ordering = ['-start_date']
 
     def __str__(self):
-        return f"{self.object_user.name} used {self.quantity_used} of {self.stock_object.name} from {self.start_date} to {self.end_date or 'Now'}"
+        return f"{self.object_user.name} used {self.quantity_used} of {self.stock_object.name}"
+
 
 class RefillSchedule(models.Model):
-    """
-    Manages scheduled refills for stock objects.
-    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     society = models.ForeignKey(
         Society,
@@ -387,5 +315,4 @@ class RefillSchedule(models.Model):
 
     def __str__(self):
         status = "Completed" if self.is_completed else "Pending"
-        return f"Refill {self.quantity_to_refill} of {self.stock_object.name} on {self.scheduled_date} ({status})"
-
+        return f"Refill {self.quantity_to_refill} of {self.stock_object.name}"

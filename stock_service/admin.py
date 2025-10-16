@@ -3,9 +3,8 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from import_export import resources
 from import_export.admin import ImportExportModelAdmin
-from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import (
-    Society, User, StockObjectKind, StockObject, Drawer, StockObjectDrawerPlacement,
+    Society, SocietyUser, StockObjectKind, StockObject, Drawer, StockObjectDrawerPlacement,
     StockMovement, ObjectUser, StockUsage, RefillSchedule
 )
 
@@ -17,10 +16,10 @@ class SocietyResource(resources.ModelResource):
         fields = ('id', 'name', 'slug', 'is_active', 'subscription_level', 'can_manage_drawers', 'shows_drawers_in_list', 'created_at', 'updated_at',)
         export_order = fields
 
-class UserResource(resources.ModelResource):
+class SocietyUserResource(resources.ModelResource):
     class Meta:
-        model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'is_staff', 'is_active', 'date_joined', 'last_login', 'society', 'is_society_admin',)
+        model = SocietyUser
+        fields = ('id', 'user', 'society', 'is_society_admin',)
         export_order = fields
 
 class StockObjectKindResource(resources.ModelResource):
@@ -72,7 +71,11 @@ class RefillScheduleResource(resources.ModelResource):
         export_order = fields
 
 # --- Admin Classes ---
-
+class SocietyUserInline(admin.TabularInline):
+    model = SocietyUser
+    extra = 1
+    fields = ('user', 'is_society_admin',)
+    
 @admin.register(Society)
 class SocietyAdmin(ImportExportModelAdmin):
     resource_class = SocietyResource
@@ -80,6 +83,7 @@ class SocietyAdmin(ImportExportModelAdmin):
     list_filter = ('is_active', 'subscription_level', 'can_manage_drawers', 'shows_drawers_in_list',)
     search_fields = ('name', 'slug',)
     prepopulated_fields = {'slug': ('name',)}
+    inlines = [SocietyUserInline]
     fieldsets = (
         (None, {'fields': ('name', 'slug', 'is_active', 'subscription_level')}),
         (_('Drawer Management Settings'), {'fields': ('can_manage_drawers', 'shows_drawers_in_list',), 'classes': ('collapse',)}),
@@ -88,27 +92,16 @@ class SocietyAdmin(ImportExportModelAdmin):
     readonly_fields = ('created_at', 'updated_at',)
 
 
-@admin.register(User)
-class UserAdmin(ImportExportModelAdmin, BaseUserAdmin):
-    resource_class = UserResource
-    list_display = ('username', 'email', 'society', 'is_staff', 'is_active', 'is_society_admin', 'date_joined',)
-    list_filter = ('is_staff', 'is_active', 'is_society_admin', 'society',)
-    search_fields = ('username', 'email', 'society__name',)
-    # Customizing fieldsets for the User model
-    fieldsets = (
-        (None, {'fields': ('username', 'password')}),
-        (_('Personal info'), {'fields': ('first_name', 'last_name', 'email')}),
-        (_('Permissions'), {'fields': ('is_active', 'is_staff', 'is_superuser', 'is_society_admin', 'groups', 'user_permissions')}),
-        (_('Important dates'), {'fields': ('last_login', 'date_joined')}),
-        (_('Society Information'), {'fields': ('society',)}),
-    )
-    add_fieldsets = (
-        (None, {
-            'classes': ('wide',),
-            'fields': ('username', 'email', 'password', 'society', 'is_society_admin',),
-        }),
-    )
-    ordering = ('society', 'username',)
+
+
+
+@admin.register(SocietyUser)
+class SocietyUserAdmin(ImportExportModelAdmin):
+    resource_class = SocietyUserResource
+    list_display = ('user', 'society', 'is_society_admin',)
+    list_filter = ('is_society_admin', 'society',)
+    search_fields = ('user__username', 'society__name',)
+    raw_id_fields = ('user', 'society',)
 
 
 @admin.register(StockObjectKind)
@@ -117,7 +110,7 @@ class StockObjectKindAdmin(ImportExportModelAdmin):
     list_display = ('name', 'society', 'description',)
     list_filter = ('society',)
     search_fields = ('name', 'society__name',)
-    raw_id_fields = ('society',) # Use raw_id_fields for ForeignKey to improve performance with many societies
+    raw_id_fields = ('society',)
 
 
 @admin.register(StockObject)

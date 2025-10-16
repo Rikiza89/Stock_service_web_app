@@ -1,128 +1,119 @@
-# stock_service/forms.py
+# stock_service/forms.py (Key excerpts for M2M)
 from django import forms
-from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.models import User
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm, UserChangeForm
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from datetime import date
 
 from .models import (
-    Society, User, StockObjectKind, StockObject, Drawer, StockObjectDrawerPlacement,
+    Society, SocietyUser, StockObjectKind, StockObject, Drawer, StockObjectDrawerPlacement,
     StockMovement, ObjectUser, StockUsage, RefillSchedule, SUBSCRIPTION_LIMITS
 )
-from django.contrib.auth.forms import AuthenticationForm, UserCreationForm, UserChangeForm
+
 
 class SocietyRegistrationForm(forms.ModelForm):
     """
-    新しい社会を登録するためのフォーム。
-    社会管理者となるユーザーも同時に作成する。
+    Register a new society and create an admin user.
     """
     admin_username = forms.CharField(
-        label=_("管理者ユーザー名"),
+        label=_("Admin Username"),
         max_length=150,
-        help_text=_("この社会の管理者アカウントのユーザー名を入力してください。")
+        help_text=_("Username for the society administrator account.")
     )
     admin_email = forms.EmailField(
-        label=_("管理者メールアドレス"),
+        label=_("Admin Email"),
         max_length=254,
-        help_text=_("管理者アカウントのメールアドレスを入力してください。")
+        help_text=_("Email for the administrator account.")
     )
     admin_password = forms.CharField(
-        label=_("管理者パスワード"),
+        label=_("Admin Password"),
         widget=forms.PasswordInput,
-        help_text=_("管理者アカウントのパスワードを入力してください。")
+        help_text=_("Password for the administrator account.")
     )
     admin_password_confirm = forms.CharField(
-        label=_("管理者パスワード確認"),
+        label=_("Confirm Admin Password"),
         widget=forms.PasswordInput,
-        help_text=_("パスワードを再入力してください。")
+        help_text=_("Re-enter the password.")
     )
 
     class Meta:
         model = Society
         fields = ['name', 'slug']
         labels = {
-            'name': _('会社名'),
-            'slug': _('会社スラッグ'),
-        }
-        help_texts = {
-            'slug': _('URLに使用される、社会の一意の識別子です（例: my-company）。'),
+            'name': _('Society Name'),
+            'slug': _('Society Slug'),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # 各フィールドにBootstrapの'form-control'クラスを適用
         for field_name in self.fields:
-            # パスワード入力フィールドには適用しない
-            if field_name not in ['admin_password', 'admin_password_confirm']:
-                self.fields[field_name].widget.attrs.update({'class': 'form-control'})
-
-            # 特にパスワードフィールドにも'form-control'を適用したい場合
-            if field_name in ['admin_password', 'admin_password_confirm']:
-                 self.fields[field_name].widget.attrs.update({'class': 'form-control'})
+            self.fields[field_name].widget.attrs.update({'class': 'form-control'})
 
     def clean_admin_password_confirm(self):
         password = self.cleaned_data.get('admin_password')
         password_confirm = self.cleaned_data.get('admin_password_confirm')
         if password and password_confirm and password != password_confirm:
-            raise forms.ValidationError(_("パスワードが一致しません。"))
+            raise forms.ValidationError(_("Passwords do not match."))
         return password_confirm
 
     def clean_slug(self):
         slug = self.cleaned_data['slug']
-        if Society.objects.filter(slug__iexact=slug).exists(): # 大文字小文字を区別しないチェック
-            raise forms.ValidationError(_("このスラッグは既に使用されています。別なものを選択してください。"))
+        if Society.objects.filter(slug__iexact=slug).exists():
+            raise forms.ValidationError(_("This slug is already in use."))
         return slug
 
     def clean_admin_username(self):
         username = self.cleaned_data['admin_username']
-        # 全社会でユーザー名が一意であることを確認
-        if User.objects.filter(username__iexact=username).exists(): # 大文字小文字を区別しないチェック
-            raise forms.ValidationError(_("このユーザー名は既に存在します。別のユーザー名を選択してください。"))
+        if User.objects.filter(username__iexact=username).exists():
+            raise forms.ValidationError(_("This username already exists."))
         return username
 
     def clean_admin_email(self):
         email = self.cleaned_data['admin_email']
-        # 全社会でメールアドレスが一意であることを確認
-        if User.objects.filter(email__iexact=email).exists(): # 大文字小文字を区別しないチェック
-            raise forms.ValidationError(_("このメールアドレスは既に登録されています。別のメールアドレスを使用してください。"))
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError(_("This email is already registered."))
         return email
 
     def save(self, commit=True):
         society = super().save(commit=False)
-        # 新規作成される社会は、デフォルトで'free'プランに設定されるため、
-        # 1管理者、2ユーザーの制限は自動的に満たされます。
-        # ここでsubscription_levelを明示的に設定することもできますが、
-        # モデルのデフォルト値に任せるのが一般的です。
-        # society.subscription_level = 'free' # 明示的に設定する場合
-
         if commit:
             society.save()
-            # 社会管理者ユーザーを作成
-            User.objects.create_user(
+            # Create admin user
+            user = User.objects.create_user(
                 username=self.cleaned_data['admin_username'],
                 email=self.cleaned_data['admin_email'],
                 password=self.cleaned_data['admin_password'],
+                is_staff=True,
+                is_active=True,
+            )
+            # CRITICAL: Create SocietyUser link
+            SocietyUser.objects.create(
+                user=user,
                 society=society,
-                is_staff=True,        # Django adminへのアクセスを許可
-                is_society_admin=True, # カスタムの社会管理者フラグ
-                is_active=True,       # 新規作成時は有効とする
+                is_society_admin=True
             )
         return society
 
+
 class UserCreateForm(UserCreationForm):
+    """
+    Create a new user and add them to a society.
+    """
+    is_society_admin = forms.BooleanField(
+        label=_("Society Admin"),
+        required=False,
+        help_text=_("Whether this user is an administrator for the society.")
+    )
+
     class Meta(UserCreationForm.Meta):
         model = User
-        fields = UserCreationForm.Meta.fields + ('first_name', 'last_name', 'email', 'is_society_admin', 'is_active',)
+        fields = ('username', 'first_name', 'last_name', 'email', 'is_society_admin',)
         labels = {
-            'username': _('ユーザー名'),
-            'first_name': _('名'),
-            'last_name': _('姓'),
-            'email': _('メールアドレス'),
-            'is_society_admin': _('会社管理者'),
-            'is_active': _('有効'),
-        }
-        help_texts = {
-            'username': _('必須。150文字以下。文字、数字、@/./+/-/_のみ。'),
+            'username': _('Username'),
+            'first_name': _('First Name'),
+            'last_name': _('Last Name'),
+            'email': _('Email'),
         }
 
     def __init__(self, *args, **kwargs):
@@ -130,13 +121,12 @@ class UserCreateForm(UserCreationForm):
         super().__init__(*args, **kwargs)
 
         for field_name in ['username', 'first_name', 'last_name', 'email']:
-            if field_name in self.fields: # Check if field exists before updating attrs
+            if field_name in self.fields:
                 self.fields[field_name].widget.attrs.update({'class': 'form-control'})
 
-        for field_name in ['is_society_admin', 'is_active']:
-            if field_name in self.fields: # Check if field exists before updating attrs
+        for field_name in ['is_society_admin']:
+            if field_name in self.fields:
                 self.fields[field_name].widget.attrs.update({'class': 'form-check-input'})
-
 
     def clean(self):
         cleaned_data = super().clean()
@@ -144,23 +134,26 @@ class UserCreateForm(UserCreationForm):
         is_society_admin = cleaned_data.get('is_society_admin')
 
         if not self.society:
-            raise forms.ValidationError(_("会社情報がフォームに渡されていません。"))
+            raise forms.ValidationError(_("Society information not provided to the form."))
 
         if username and self.society:
-            if User.objects.filter(society=self.society, username__iexact=username).exists():
-                self.add_error('username', _("このユーザー名は既にこの会社で使用されています。"))
+            if SocietyUser.objects.filter(
+                society=self.society,
+                user__username__iexact=username
+            ).exists():
+                self.add_error('username', _("This username is already used in this society."))
 
         current_level = self.society.subscription_level
         max_admins = SUBSCRIPTION_LIMITS[current_level]['max_admins']
         max_users = SUBSCRIPTION_LIMITS[current_level]['max_users']
-        current_society_users = User.objects.filter(society=self.society)
+        current_society_users = SocietyUser.objects.filter(society=self.society)
         existing_admin_count = current_society_users.filter(is_society_admin=True).count()
         existing_total_user_count = current_society_users.count()
 
         if is_society_admin and existing_admin_count >= max_admins:
             self.add_error(
                 'is_society_admin',
-                _("現在のサブスクリプションプランでは、これ以上管理者を追加できません。(現在の管理者数: %(current)s / 最大: %(max)s)") % {
+                _("Cannot add more admins for this plan. (Current: %(current)s / Max: %(max)s)") % {
                     'current': existing_admin_count,
                     'max': max_admins
                 }
@@ -168,8 +161,8 @@ class UserCreateForm(UserCreationForm):
 
         if existing_total_user_count >= max_users:
             self.add_error(
-                None, # General form error for total user count
-                _("現在のサブスクリプションプランでは、これ以上ユーザーを追加できません。(現在のユーザー数: %(current)s / 最大: %(max)s)") % {
+                None,
+                _("Cannot add more users for this plan. (Current: %(current)s / Max: %(max)s)") % {
                     'current': existing_total_user_count,
                     'max': max_users
                 }
@@ -177,22 +170,39 @@ class UserCreateForm(UserCreationForm):
 
         return cleaned_data
 
+    def save(self, commit=True):
+        user = super().save(commit=commit)
+        if self.society:
+            SocietyUser.objects.create(
+                user=user,
+                society=self.society,
+                is_society_admin=self.cleaned_data.get('is_society_admin', False)
+            )
+        return user
+
 
 class UserUpdateForm(UserChangeForm):
+    """
+    Update user information and society admin status.
+    """
+    is_society_admin = forms.BooleanField(
+        label=_("Society Admin"),
+        required=False,
+        help_text=_("Whether this user is an administrator for the society.")
+    )
+
     class Meta(UserChangeForm.Meta):
         model = User
-        fields = ('first_name', 'last_name', 'email', 'is_society_admin', 'is_active',) # Exclude username to prevent complexity
+        fields = ('first_name', 'last_name', 'email', 'is_active',)
         labels = {
-            'first_name': _('名'),
-            'last_name': _('姓'),
-            'email': _('メールアドレス'),
-            'is_society_admin': _('会社管理者'),
-            'is_active': _('有効'),
+            'first_name': _('First Name'),
+            'last_name': _('Last Name'),
+            'email': _('Email'),
+            'is_active': _('Active'),
         }
 
     def __init__(self, *args, **kwargs):
         self.society = kwargs.pop('society', None)
-        # Store the original is_society_admin value when the form is initialized
         self.original_is_society_admin = kwargs.pop('original_is_society_admin', None)
         super().__init__(*args, **kwargs)
 
@@ -200,227 +210,221 @@ class UserUpdateForm(UserChangeForm):
             if field_name in self.fields:
                 self.fields[field_name].widget.attrs.update({'class': 'form-control'})
 
-        for field_name in ['is_society_admin', 'is_active']:
-            if field_name in self.fields:
-                self.fields[field_name].widget.attrs.update({'class': 'form-check-input'})
+        if 'is_active' in self.fields:
+            self.fields['is_active'].widget.attrs.update({'class': 'form-check-input'})
 
-        if self.instance and self.instance.is_society_admin and \
-           self.society and self.society.subscription_level == 'free':
-            other_admins_count = User.objects.filter(
-                society=self.society, is_society_admin=True
-            ).exclude(pk=self.instance.pk).count()
+        self.fields['is_society_admin'].widget.attrs.update({'class': 'form-check-input'})
 
-            if other_admins_count == 0:
+        # Set initial value for is_society_admin
+        if self.instance and self.society:
+            society_user = SocietyUser.objects.filter(
+                user=self.instance,
+                society=self.society
+            ).first()
+            if society_user:
+                self.fields['is_society_admin'].initial = society_user.is_society_admin
+                self.original_is_society_admin = society_user.is_society_admin
+
+        # Check if this is the last admin in a free plan
+        if self.instance and self.society and self.society.subscription_level == 'free':
+            other_admins_count = SocietyUser.objects.filter(
+                society=self.society,
+                is_society_admin=True
+            ).exclude(user=self.instance).count()
+
+            if other_admins_count == 0 and self.original_is_society_admin:
                 self.fields['is_society_admin'].widget.attrs['disabled'] = True
-                self.fields['is_society_admin'].help_text = _("無料プランでは、少なくとも1人の管理者が常に必要です。別の管理者がいる場合にのみ、このユーザーの管理者ステータスを解除できます。")
+                self.fields['is_society_admin'].help_text = _(
+                    "Free plan requires at least one admin. Cannot remove admin status."
+                )
 
     def clean(self):
         cleaned_data = super().clean()
-        is_society_admin_new_state = cleaned_data.get('is_society_admin') # The NEW state from form
-        is_active_new_state = cleaned_data.get('is_active') # The NEW state from form
+        is_society_admin_new_state = cleaned_data.get('is_society_admin')
+        is_active_new_state = cleaned_data.get('is_active')
 
         if not self.society:
-            raise forms.ValidationError(_("会社情報がフォームに渡されていません。"))
+            raise forms.ValidationError(_("Society information not provided to the form."))
 
         current_level = self.society.subscription_level
         max_admins = SUBSCRIPTION_LIMITS[current_level]['max_admins']
         max_users = SUBSCRIPTION_LIMITS[current_level]['max_users']
 
-        current_society_users_queryset = User.objects.filter(society=self.society)
+        admin_count_excluding_current = SocietyUser.objects.filter(
+            society=self.society,
+            is_society_admin=True
+        ).exclude(user=self.instance).count()
 
-        admin_count_excluding_current_user = current_society_users_queryset.filter(is_society_admin=True).exclude(pk=self.instance.pk).count()
-
+        # Check if promoting to admin exceeds limit
         if not self.original_is_society_admin and is_society_admin_new_state:
-            if (admin_count_excluding_current_user + 1) > max_admins:
+            if (admin_count_excluding_current + 1) > max_admins:
                 self.add_error(
                     'is_society_admin',
-                    _("現在のサブスクリプションプランでは、これ以上管理者を追加できません。(現在の管理者数: %(current)s / 最大: %(max)s)") % {
-                        'current': admin_count_excluding_current_user, # Show count before this user is added as admin
+                    _("Cannot add more admins for this plan. (Current: %(current)s / Max: %(max)s)") % {
+                        'current': admin_count_excluding_current,
                         'max': max_admins
                     }
                 )
 
+        # Check if activating user exceeds limit
         if not self.instance.is_active and is_active_new_state:
-            total_active_users_excluding_this_user = current_society_users_queryset.filter(is_active=True).exclude(pk=self.instance.pk).count()
-            if (total_active_users_excluding_this_user + 1) > max_users:
-                 self.add_error(
+            total_active_users_excluding_this = SocietyUser.objects.filter(
+                society=self.society,
+                user__is_active=True
+            ).exclude(user=self.instance).count()
+            if (total_active_users_excluding_this + 1) > max_users:
+                self.add_error(
                     'is_active',
-                    _("現在のサブスクリプションプランでは、これ以上有効なユーザーを追加できません。(現在の有効ユーザー数: %(current)s / 最大: %(max)s)") % {
-                        'current': total_active_users_excluding_this_user,
+                    _("Cannot add more users for this plan. (Current: %(current)s / Max: %(max)s)") % {
+                        'current': total_active_users_excluding_this,
                         'max': max_users
                     }
                 )
 
-        if self.instance and self.instance.pk:
+        # Check if demoting the last admin in free plan
+        if self.instance.pk:
             if self.original_is_society_admin and not is_society_admin_new_state:
                 if self.society and self.society.subscription_level == 'free':
-                    other_admins_count_if_this_user_is_revoked = current_society_users_queryset.filter(is_society_admin=True).exclude(pk=self.instance.pk).count()
+                    other_admins_count_if_revoked = SocietyUser.objects.filter(
+                        society=self.society,
+                        is_society_admin=True
+                    ).exclude(user=self.instance).count()
 
-                    if other_admins_count_if_this_user_is_revoked == 0:
+                    if other_admins_count_if_revoked == 0:
                         self.add_error(
                             'is_society_admin',
-                            _("無料プランでは、少なくとも1人の管理者が常に必要です。このユーザーの管理者ステータスを解除するには、他の管理者がいる必要があります。")
+                            _("Free plan requires at least one admin. Cannot remove this admin.")
                         )
 
         return cleaned_data
 
+    def save(self, commit=True):
+        user = super().save(commit=commit)
+        if self.society:
+            society_user, created = SocietyUser.objects.get_or_create(
+                user=user,
+                society=self.society
+            )
+            society_user.is_society_admin = self.cleaned_data.get('is_society_admin', False)
+            if commit:
+                society_user.save()
+        return user
+
+
 class CustomAuthenticationForm(AuthenticationForm):
     """
-    社会名、ユーザー名、パスワードを要求するカスタム認証フォーム。
-    DjangoのAuthenticationFormを継承し、society_nameフィールドを追加します。
+    Custom authentication form requiring society name, username, and password.
     """
     society_name = forms.CharField(
-        label=_("会社名"),
+        label=_("Society Name"),
         max_length=255,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('あなたの会社の名前')}),
-        help_text=_("所属する社会の正確な名前を入力してください。"),
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('Your society name')}),
+        help_text=_("Enter the exact name of your society."),
     )
 
-    # AuthenticationFormが既にusernameとpasswordフィールドを提供しているので、
-    # ここで改めて定義する必要はありません。
-    # ただし、ウィジェットやヘルプテキストをカスタマイズする場合はここで上書きできます。
-    # 例:
     def __init__(self, request=None, *args, **kwargs):
         super().__init__(request=request, *args, **kwargs)
-        # usernameフィールドのラベルを変更する場合
-        self.fields['username'].label = _("ユーザー名")
-        self.fields['username'].widget = forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('あなたのユーザー名')})
-        self.fields['password'].widget = forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': _('パスワード')})
-
+        self.fields['username'].label = _("Username")
+        self.fields['username'].widget = forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('Your username')})
+        self.fields['password'].widget = forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': _('Password')})
 
     def clean(self):
-        """
-        カスタムバリデーションロジック。
-        まずAuthenticationFormのバリデーションを実行し、その後社会名をチェックします。
-        """
-        # AuthenticationFormのcleanメソッドを呼び出し、usernameとpasswordを検証
-        # これにより、ユーザー名とパスワードの基本的なチェックが行われます。
         cleaned_data = super().clean()
-
-        # ここでsociety_nameを取得して、存在するかどうかをチェックします。
-        # ユーザー認証はビューで行うため、ここでは社会の存在確認のみに留めます。
         society_name = cleaned_data.get('society_name')
 
         if society_name:
             try:
                 Society.objects.get(name=society_name)
             except Society.DoesNotExist:
-                # AuthenticationFormのcleaned_dataからエラーを削除し、
-                # 新しいエラーを追加してフィールドに紐づける
-                self.add_error('society_name', _("指定された会社が見つかりません。"))
-                # AuthenticationFormがis_valid()で認証失敗と判断した場合は
-                # user_cacheがNoneになるので、それをクリアして認証失敗の状態を維持
+                self.add_error('society_name', _("The specified society was not found."))
                 if hasattr(self, 'user_cache'):
                     del self.user_cache
 
-        # cleanメソッドの最後でエラーが追加されている可能性があるため、
-        # ValidationErrorを再raiseしないように注意
         return cleaned_data
 
 
 class StockObjectKindForm(forms.ModelForm):
     """
-    在庫品目の種類を追加・編集するためのフォーム。
+    Form for adding/editing stock object kinds.
     """
     class Meta:
         model = StockObjectKind
-        fields = ['name', 'description'] # descriptionフィールドを追加
+        fields = ['name', 'description']
         labels = {
-            'name': _('種類名'),
-            'description': _('説明'), # descriptionのラベルを追加
-        }
-        help_texts = {
-            'name': _('在庫品目の種類を識別する一意の名前。'),
-            'description': _('この品目種類の詳細な説明。'), # descriptionのヘルプテキストを追加
+            'name': _('Kind Name'),
+            'description': _('Description'),
         }
 
     def __init__(self, *args, **kwargs):
-        # society インスタンスをフォームに渡すためのカスタム引数
         self.society = kwargs.pop('society', None)
         super().__init__(*args, **kwargs)
-
-        # Bootstrapクラスを適用
         self.fields['name'].widget.attrs.update({'class': 'form-control'})
         self.fields['description'].widget.attrs.update({'class': 'form-control', 'rows': 3})
 
-
     def clean_name(self):
         name = self.cleaned_data['name']
-
-        # society_context を確実に取得
         society_context = self.instance.society if self.instance and self.instance.pk else self.society
 
         if not society_context:
-            raise forms.ValidationError(_("社会情報が見つかりません。フォームが正しく初期化されていません。"))
+            raise forms.ValidationError(_("Society not found. Form not properly initialized."))
 
-        # 同じ社会内で名前の重複をチェック
-        queryset = StockObjectKind.objects.filter(society=society_context, name__iexact=name) # 大文字小文字を区別しない
+        queryset = StockObjectKind.objects.filter(society=society_context, name__iexact=name)
 
-        # 既存のオブジェクトを更新している場合、自分自身をチェック対象から除外
         if self.instance and self.instance.pk:
             queryset = queryset.exclude(pk=self.instance.pk)
 
         if queryset.exists():
-            raise forms.ValidationError(_("この種類名は既に存在します。"))
+            raise forms.ValidationError(_("This kind name already exists."))
         return name
 
 
 class StockObjectForm(forms.ModelForm):
     """
-    在庫品目を追加・編集するためのフォーム。
+    Form for adding/editing stock objects.
     """
     class Meta:
         model = StockObject
         fields = ['kind', 'name', 'description', 'current_quantity', 'minimum_quantity', 'unit', 'location_description', 'is_active']
         labels = {
-            'kind': _('種類'),
-            'name': _('品目名'),
-            'description': _('説明'),
-            'current_quantity': _('現在の数量'),
-            'minimum_quantity': _('最低在庫数量'),
-            'unit': _('単位'),
-            'location_description': _('一般的な保管場所'),
-            'is_active': _('有効'),
-        }
-        help_texts = {
-            'minimum_quantity': _('この数量を下回ると補充が必要と見なされます。'),
-            'unit': _('例: 個、kg、メートル'),
-            'location_description': _('引き出しを使用しない場合の一般的な保管場所の説明。'),
+            'kind': _('Kind'),
+            'name': _('Name'),
+            'description': _('Description'),
+            'current_quantity': _('Current Quantity'),
+            'minimum_quantity': _('Minimum Quantity'),
+            'unit': _('Unit'),
+            'location_description': _('Location Description'),
+            'is_active': _('Active'),
         }
 
     def __init__(self, *args, **kwargs):
         self.society = kwargs.pop('society', None)
         super().__init__(*args, **kwargs)
         if self.society:
-            # 現在の社会に紐づくStockObjectKindのみを表示
             self.fields['kind'].queryset = StockObjectKind.objects.filter(society=self.society)
-            self.fields['kind'].empty_label = _("種類を選択してください")
+            self.fields['kind'].empty_label = _("Select a kind")
 
     def clean_name(self):
         name = self.cleaned_data['name']
         if self.society and StockObject.objects.filter(society=self.society, name=name).exists():
-            if self.instance and self.instance.name == name: # 既存のオブジェクト自身の場合はOK
+            if self.instance and self.instance.name == name:
                 pass
             else:
-                raise forms.ValidationError(_("この品目名は既に存在します。"))
+                raise forms.ValidationError(_("This item name already exists."))
         return name
 
 
 class StockMovementForm(forms.ModelForm):
     """
-    在庫の入出庫を記録するためのフォーム。
+    Form for recording stock movements (in/out).
     """
     class Meta:
         model = StockMovement
         fields = ['stock_object', 'quantity', 'notes', 'drawer_involved']
         labels = {
-            'stock_object': _('在庫品目'),
-            'quantity': _('数量'),
-            'notes': _('備考'),
-            'drawer_involved': _('関連する引き出し'),
-        }
-        help_texts = {
-            'drawer_involved': _('出庫または入庫を行った引き出しを選択してください（該当する場合）。'),
+            'stock_object': _('Stock Item'),
+            'quantity': _('Quantity'),
+            'notes': _('Notes'),
+            'drawer_involved': _('Related Drawer'),
         }
 
     def __init__(self, *args, **kwargs):
@@ -430,78 +434,64 @@ class StockMovementForm(forms.ModelForm):
             self.fields['stock_object'].queryset = StockObject.objects.filter(society=self.society)
             self.fields['drawer_involved'].queryset = Drawer.objects.filter(society=self.society)
 
-            # Societyが引き出し管理を許可していない場合、drawer_involvedフィールドを非表示にする
             if not self.society.can_manage_drawers:
                 self.fields['drawer_involved'].widget = forms.HiddenInput()
                 self.fields['drawer_involved'].required = False
             else:
-                self.fields['drawer_involved'].empty_label = _("引き出しを選択 (オプション)")
+                self.fields['drawer_involved'].empty_label = _("Select a drawer (optional)")
 
 
 class ObjectUserForm(forms.ModelForm):
     """
-    オブジェクトユーザー（在庫品目を使用する人/部署）を追加・編集するためのフォーム。
+    Form for adding/editing object users (people/departments using stock).
     """
     class Meta:
         model = ObjectUser
         fields = ['name', 'contact_info', 'notes']
         labels = {
-            'name': _('ユーザー名/部署名'),
-            'contact_info': _('連絡先情報'),
-            'notes': _('備考'),
-        }
-        help_texts = {
-            'name': _('プロジェクト名、顧客名など、在庫を使用するエンティティの名前。'),
-            'contact_info': _('このオブジェクトユーザーの連絡先情報。'),
-            'notes': _('このオブジェクトユーザーに関する詳細情報やメモ。'),
+            'name': _('Name/Department'),
+            'contact_info': _('Contact Information'),
+            'notes': _('Notes'),
         }
 
     def __init__(self, *args, **kwargs):
-        # Viewから渡される society インスタンスを取得
         self.society = kwargs.pop('society', None)
         super().__init__(*args, **kwargs)
-
-        # Bootstrapクラスを適用
         self.fields['name'].widget.attrs.update({'class': 'form-control'})
         self.fields['contact_info'].widget.attrs.update({'class': 'form-control'})
         self.fields['notes'].widget.attrs.update({'class': 'form-control', 'rows': 4})
 
     def clean_name(self):
         name = self.cleaned_data['name']
-
         society_for_validation = self.society
 
         if not society_for_validation:
-            # This should ideally not happen if get_form_kwargs is properly implemented
-            raise forms.ValidationError(_("会社情報が見つかりません。フォームが正しく初期化されていません。"))
+            raise forms.ValidationError(_("Society not found. Form not properly initialized."))
 
-        # 同じ society 内で name の重複をチェック
-        queryset = ObjectUser.objects.filter(society=society_for_validation, name__iexact=name) # 大文字小文字を区別しない
+        queryset = ObjectUser.objects.filter(society=society_for_validation, name__iexact=name)
 
-        # 既存のオブジェクトを更新している場合、自分自身をチェック対象から除外
         if self.instance and self.instance.pk:
             queryset = queryset.exclude(pk=self.instance.pk)
 
         if queryset.exists():
-            raise forms.ValidationError(_("このオブジェクトユーザー名は既に存在します。"))
+            raise forms.ValidationError(_("This object user name already exists."))
         return name
-
 
 
 class StockUsageForm(forms.ModelForm):
     """
-    オブジェクトユーザーによる在庫品目の使用を記録するためのフォーム。
+    Form for recording stock usage by object users.
     """
     class Meta:
         model = StockUsage
         fields = ['stock_object', 'object_user', 'quantity_used', 'start_date', 'end_date', 'notes']
         labels = {
-            'stock_object': _('在庫品目'),
-            'object_user': _('利用ユーザー/部署'),
-            'quantity_used': _('利用数量'),
-            'start_date': _('利用開始日'),
-            'end_date': _('利用終了日'),
-            'notes': _('備考'),
+            'stock_object': _('Stock Item'),
+            'object_user': _('User/Department'),
+            'quantity_used': _('Quantity Used'),
+            'start_date': _('Start Date'),
+            'end_date': _('End Date'),
+            'notes': _('Notes'),
         }
         widgets = {
             'start_date': forms.DateInput(attrs={'type': 'date'}),
@@ -514,8 +504,8 @@ class StockUsageForm(forms.ModelForm):
         if self.society:
             self.fields['stock_object'].queryset = StockObject.objects.filter(society=self.society)
             self.fields['object_user'].queryset = ObjectUser.objects.filter(society=self.society)
-            self.fields['stock_object'].empty_label = _("在庫品目を選択")
-            self.fields['object_user'].empty_label = _("利用ユーザー/部署を選択")
+            self.fields['stock_object'].empty_label = _("Select item")
+            self.fields['object_user'].empty_label = _("Select user/department")
 
     def clean(self):
         cleaned_data = super().clean()
@@ -523,22 +513,22 @@ class StockUsageForm(forms.ModelForm):
         end_date = cleaned_data.get('end_date')
 
         if start_date and end_date and end_date < start_date:
-            self.add_error('end_date', _("終了日は開始日より後でなければなりません。"))
+            self.add_error('end_date', _("End date must be after start date."))
         return cleaned_data
 
 
 class RefillScheduleForm(forms.ModelForm):
     """
-    在庫補充スケジュールを管理するためのフォーム。
+    Form for managing refill schedules.
     """
     class Meta:
         model = RefillSchedule
         fields = ['stock_object', 'scheduled_date', 'quantity_to_refill', 'notes']
         labels = {
-            'stock_object': _('在庫品目'),
-            'scheduled_date': _('補充予定日'),
-            'quantity_to_refill': _('補充数量'),
-            'notes': _('備考'),
+            'stock_object': _('Stock Item'),
+            'scheduled_date': _('Scheduled Date'),
+            'quantity_to_refill': _('Quantity to Refill'),
+            'notes': _('Notes'),
         }
         widgets = {
             'scheduled_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
@@ -553,11 +543,14 @@ class RefillScheduleForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         if self.society:
-            self.fields['stock_object'].queryset = StockObject.objects.filter(society=self.society, is_active=True).order_by('name')
+            self.fields['stock_object'].queryset = StockObject.objects.filter(
+                society=self.society,
+                is_active=True
+            ).order_by('name')
         else:
             self.fields['stock_object'].queryset = StockObject.objects.none()
 
-        self.fields['stock_object'].empty_label = _("在庫品目を選択")
+        self.fields['stock_object'].empty_label = _("Select item")
 
         if self.initial_stock_object:
             self.fields['stock_object'].initial = self.initial_stock_object
@@ -566,7 +559,7 @@ class RefillScheduleForm(forms.ModelForm):
     def clean_scheduled_date(self):
         scheduled_date = self.cleaned_data['scheduled_date']
         if scheduled_date and scheduled_date < date.today():
-            raise forms.ValidationError(_("補充予定日は今日以降の日付でなければなりません。"))
+            raise forms.ValidationError(_("Scheduled date must be today or later."))
         return scheduled_date
 
     def clean_stock_object(self):
@@ -583,23 +576,18 @@ class RefillScheduleForm(forms.ModelForm):
         return instance
 
 
-
 class DrawerForm(forms.ModelForm):
     """
-    引き出しを追加・編集するためのフォーム。
+    Form for adding/editing drawers.
     """
     class Meta:
         model = Drawer
         fields = ['cabinet_name', 'drawer_letter_x', 'drawer_number_y', 'description']
         labels = {
-            'cabinet_name': _('キャビネット名'),
-            'drawer_letter_x': _('引き出しの文字（X座標）'),
-            'drawer_number_y': _('引き出しの番号（Y座標）'),
-            'description': _('説明'),
-        }
-        help_texts = {
-            'drawer_letter_x': _('例: A, B, C'),
-            'drawer_number_y': _('例: 1, 2, 3'),
+            'cabinet_name': _('Cabinet Name'),
+            'drawer_letter_x': _('Letter (X)'),
+            'drawer_number_y': _('Number (Y)'),
+            'description': _('Description'),
         }
 
     def __init__(self, *args, **kwargs):
@@ -613,35 +601,31 @@ class DrawerForm(forms.ModelForm):
         drawer_number_y = cleaned_data.get('drawer_number_y')
 
         if self.society and cabinet_name and drawer_letter_x and drawer_number_y:
-            # 同じ社会内で、同じキャビネット名、X座標、Y座標の引き出しが既に存在しないかチェック
             qs = Drawer.objects.filter(
                 society=self.society,
                 cabinet_name=cabinet_name,
-                drawer_letter_x__iexact=drawer_letter_x, # 大文字小文字を区別しない
+                drawer_letter_x__iexact=drawer_letter_x,
                 drawer_number_y=drawer_number_y
             )
-            if self.instance: # 編集の場合、自分自身を除外
+            if self.instance:
                 qs = qs.exclude(pk=self.instance.pk)
 
             if qs.exists():
-                raise forms.ValidationError(_("この引き出しは既に存在します。別の座標を入力してください。"))
+                raise forms.ValidationError(_("This drawer already exists."))
         return cleaned_data
 
 
 class StockObjectDrawerPlacementForm(forms.ModelForm):
     """
-    在庫品目を引き出しに配置するためのフォーム。
+    Form for placing stock items in drawers.
     """
     class Meta:
         model = StockObjectDrawerPlacement
         fields = ['stock_object', 'drawer', 'quantity']
         labels = {
-            'stock_object': _('在庫品目'),
-            'drawer': _('引き出し'),
-            'quantity': _('数量'),
-        }
-        help_texts = {
-            'quantity': _('この引き出しに配置する在庫品目の数量。'),
+            'stock_object': _('Stock Item'),
+            'drawer': _('Drawer'),
+            'quantity': _('Quantity'),
         }
 
     def __init__(self, *args, **kwargs):
@@ -650,8 +634,8 @@ class StockObjectDrawerPlacementForm(forms.ModelForm):
         if self.society:
             self.fields['stock_object'].queryset = StockObject.objects.filter(society=self.society)
             self.fields['drawer'].queryset = Drawer.objects.filter(society=self.society)
-            self.fields['stock_object'].empty_label = _("在庫品目を選択")
-            self.fields['drawer'].empty_label = _("引き出しを選択")
+            self.fields['stock_object'].empty_label = _("Select item")
+            self.fields['drawer'].empty_label = _("Select drawer")
 
     def clean(self):
         cleaned_data = super().clean()
@@ -660,41 +644,33 @@ class StockObjectDrawerPlacementForm(forms.ModelForm):
         quantity = cleaned_data.get('quantity')
 
         if stock_object and drawer:
-            # 同じ在庫品目と引き出しの組み合わせが既に存在しないかチェック
             qs = StockObjectDrawerPlacement.objects.filter(
                 stock_object=stock_object,
                 drawer=drawer
             )
-            if self.instance: # 編集の場合、自分自身を除外
+            if self.instance:
                 qs = qs.exclude(pk=self.instance.pk)
 
             if qs.exists():
-                raise forms.ValidationError(_("この在庫品目は、この引き出しに既に割り当てられています。既存の割り当てを編集してください。"))
+                raise forms.ValidationError(_("This item is already assigned to this drawer."))
 
-        # 配置しようとする数量が在庫品の現在の数量を超えていないか（新規作成時のみの簡易チェック）
-        # より厳密なチェックはビューでトランザクション内で行うべき
         if stock_object and quantity is not None and quantity > stock_object.current_quantity:
-            self.add_error('quantity', _("引き出しに配置する数量は、在庫の現在の数量を超えることはできません。(現在の在庫: %(current)s個)") % {'current': stock_object.current_quantity})
+            self.add_error('quantity', _("Quantity cannot exceed current stock."))
 
         return cleaned_data
 
 
 class SocietySettingsForm(forms.ModelForm):
     """
-    社会ごとの設定（引き出し管理の有効化/無効化など）を更新するフォーム。
+    Form for updating society settings.
     """
     class Meta:
         model = Society
         fields = ['can_manage_drawers', 'shows_drawers_in_list', 'subscription_level']
         labels = {
-            'can_manage_drawers': _('引き出し管理を有効にする'),
-            'shows_drawers_in_list': _('在庫リストに引き出し情報を表示する'),
-            'subscription_level': _('サブスクリプションレベル'),
-        }
-        help_texts = {
-            'can_manage_drawers': _('このオプションを有効にすると、在庫品目を個々の引き出しに割り当てることができます。'),
-            'shows_drawers_in_list': _('有効にすると、在庫リストで各品目の引き出し配置情報が表示されます。'),
-            'subscription_level': _('会社の現在のサブスクリプションレベルです。管理者によってのみ変更可能です。'),
+            'can_manage_drawers': _('Enable Drawer Management'),
+            'shows_drawers_in_list': _('Show Drawers in Stock List'),
+            'subscription_level': _('Subscription Level'),
         }
 
     def __init__(self, *args, **kwargs):
@@ -705,33 +681,29 @@ class SocietySettingsForm(forms.ModelForm):
                 self.fields[field_name].widget.attrs.update({'class': 'form-check-input'})
 
         if 'subscription_level' in self.fields:
-            # Remove readonly/plaintext styling. It will now be a standard select dropdown.
-            # Add a Bootstrap class for select elements
             self.fields['subscription_level'].widget.attrs.update({'class': 'form-control'})
 
         if self.instance:
             if self.instance.subscription_level == 'free':
                 if 'can_manage_drawers' in self.fields:
                     self.fields['can_manage_drawers'].widget.attrs['disabled'] = 'disabled'
-                    self.fields['can_manage_drawers'].help_text += " " + _("無料プランではこの機能は利用できません。アップグレードしてください。")
+                    self.fields['can_manage_drawers'].help_text += _(" (Not available in free plan)")
 
                 if 'shows_drawers_in_list' in self.fields:
                     self.fields['shows_drawers_in_list'].widget.attrs['disabled'] = 'disabled'
-                    self.fields['shows_drawers_in_list'].help_text += " " + _("無料プランではこの機能は利用できません。アップグレードしてください。")
+                    self.fields['shows_drawers_in_list'].help_text += _(" (Not available in free plan)")
 
             elif self.instance.subscription_level == 'basic':
-                 if 'shows_drawers_in_list' in self.fields:
+                if 'shows_drawers_in_list' in self.fields:
                     self.fields['shows_drawers_in_list'].widget.attrs['disabled'] = 'disabled'
-                    self.fields['shows_drawers_in_list'].help_text += " " + _("この機能はプレミアムプランでのみ利用可能です。")
+                    self.fields['shows_drawers_in_list'].help_text += _(" (Premium plan only)")
 
     def clean_can_manage_drawers(self):
         can_manage_drawers = self.cleaned_data.get('can_manage_drawers')
         submitted_subscription_level = self.cleaned_data.get('subscription_level')
 
         if can_manage_drawers and submitted_subscription_level == 'free':
-            raise forms.ValidationError(
-                _("選択されたプランでは「引き出し管理」機能を利用できません。")
-            )
+            raise forms.ValidationError(_("This feature is not available in the free plan."))
         return can_manage_drawers
 
     def clean_shows_drawers_in_list(self):
@@ -739,12 +711,7 @@ class SocietySettingsForm(forms.ModelForm):
         submitted_subscription_level = self.cleaned_data.get('subscription_level')
 
         if shows_drawers_in_list and submitted_subscription_level == 'free':
-            raise forms.ValidationError(
-                _("選択されたプランでは「在庫リストに引き出し情報を表示」機能は利用できません。")
-            )
+            raise forms.ValidationError(_("This feature is not available in the free plan."))
         if shows_drawers_in_list and submitted_subscription_level == 'basic':
-            raise forms.ValidationError(
-                _("選択されたプランではこの機能はプレミアムプランでのみ利用可能です。")
-            )
+            raise forms.ValidationError(_("This feature is only available in the premium plan."))
         return shows_drawers_in_list
-
