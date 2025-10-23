@@ -25,7 +25,7 @@ SECRET_KEY = "django-insecure-vut&k89&3^#w!k%jz&7-4atsy-kci(y0b0+xoa6t#^ozf-rg_r
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['stock-service-web-app.onrender.com']
 
 
 # Application definition
@@ -148,4 +148,5 @@ LOGIN_REDIRECT_URL = 'stock_service:app_home_stock_service'
 SESSION_COOKIE_AGE = 1800  # 30 minutes
 
 # Optional: Set this to True if you want the session to expire when the user closes the browser
+
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
